@@ -1,0 +1,18 @@
+# Generated Gradle files
+.gradle/
+.kotlin/
+**/build/
+
+# Local Android Studio settings
+.idea/
+*.iml
+
+# Machine-specific Android SDK location
+local.properties
+
+# macOS files
+.DS_Store
+
+# Signing files
+*.jks
+*.keystore
