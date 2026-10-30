@@ -26,6 +26,7 @@ import com.example.nextin.data.model.BusinessType
 @Composable
 fun CustomerHomeScreen(
     businesses: List<Business>,
+    onBusinessClick: (String) -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -74,15 +75,24 @@ fun CustomerHomeScreen(
                 items = businesses,
                 key = { business -> business.id }
             ) { business ->
-                BusinessListItem(business = business)
+                BusinessListItem(
+                    business = business,
+                    onClick = {
+                        onBusinessClick(business.id)
+                    }
+                )
             }
         }
     }
 }
 
 @Composable
-private fun BusinessListItem(business: Business) {
+private fun BusinessListItem(
+    business: Business,
+    onClick: () -> Unit
+) {
     Card(
+        onClick = onClick,
         modifier = Modifier.fillMaxWidth()
     ) {
         Column(

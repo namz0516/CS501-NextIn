@@ -5,11 +5,18 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.nextin.ui.welcome.WelcomeScreen
+import android.net.Uri
 
 object Routes {
     const val WELCOME = "welcome"
     const val CUSTOMER = "customer"
     const val STAFF = "staff"
+
+    const val BUSINESS_DETAILS = "business/{businessId}"
+
+    fun businessDetails(businessId: String): String {
+        return "business/${Uri.encode(businessId)}"
+    }
 }
 
 @Composable
