@@ -20,12 +20,15 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
 import com.example.nextin.data.model.Business
+import com.example.nextin.data.model.QueueEntry
+import com.example.nextin.domain.queue.QueuePolicy
 import com.example.nextin.data.model.BusinessType
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun CustomerHomeScreen(
     businesses: List<Business>,
+    entries: List<QueueEntry>,
     onBusinessClick: (String) -> Unit,
     onMyQueue: () -> Unit,
     onBack: () -> Unit
@@ -81,6 +84,7 @@ fun CustomerHomeScreen(
             ) { business ->
                 BusinessListItem(
                     business = business,
+                    waitMinutes = QueuePolicy.estimatedWaitMinutes(business, entries, 1),
                     onClick = {
                         onBusinessClick(business.id)
                     }
@@ -93,6 +97,7 @@ fun CustomerHomeScreen(
 @Composable
 private fun BusinessListItem(
     business: Business,
+    waitMinutes: Int?,
     onClick: () -> Unit
 ) {
     Card(
@@ -147,7 +152,8 @@ private fun BusinessListItem(
 
             Text(
                 text = if (business.queueOpen) {
-                    "Estimated wait unavailable"
+                    waitMinutes?.let { "Approx. wait for 1 person: ~$it min" }
+                        ?: "Estimated wait unavailable"
                 } else {
                     "Not accepting new queue entries"
                 },

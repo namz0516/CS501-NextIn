@@ -24,6 +24,7 @@ import com.example.nextin.data.model.BusinessType
 @Composable
 fun BusinessDetailsScreen(
     business: Business?,
+    estimatedWaitMinutes: Int?,
     onJoin: () -> Unit,
     onBack: () -> Unit
 ) {
@@ -91,7 +92,8 @@ fun BusinessDetailsScreen(
 
                 Text(
                     text = if (business.queueOpen) {
-                        "Estimated wait unavailable"
+                        estimatedWaitMinutes?.let { "Approx. wait for 1 person: ~$it min" }
+                            ?: "Estimated wait unavailable"
                     } else {
                         "Not accepting new queue entries"
                     },

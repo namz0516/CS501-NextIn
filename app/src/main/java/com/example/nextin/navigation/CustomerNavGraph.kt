@@ -8,6 +8,7 @@ import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
+import com.example.nextin.domain.queue.QueuePolicy
 import com.example.nextin.data.model.QueueEntry
 import com.example.nextin.data.model.QueueStatus
 import com.example.nextin.ui.customer.BusinessDetailsScreen
@@ -32,6 +33,7 @@ fun NavGraphBuilder.customerNavGraph(
 
         CustomerHomeScreen(
             businesses = snapshot.businesses,
+            entries = snapshot.entries,
             onBusinessClick = { id ->
                 navController.navigate(Routes.businessDetails(id))
             },
@@ -50,6 +52,9 @@ fun NavGraphBuilder.customerNavGraph(
 
         BusinessDetailsScreen(
             business = business,
+            estimatedWaitMinutes = business?.let {
+                QueuePolicy.estimatedWaitMinutes(it, snapshot.entries, 1)
+            },
             onJoin = {
                 business?.let {
                     navController.navigate(Routes.joinQueue(it.id))
@@ -86,7 +91,7 @@ fun NavGraphBuilder.customerNavGraph(
     composable(Routes.MY_QUEUE) {
         val snapshot by queueViewModel.state.collectAsStateWithLifecycle()
         val error by queueViewModel.error.collectAsStateWithLifecycle()
-        val entry = queueViewModel.activeEntry(snapshot)
+        val entry = queueViewModel.currentEntry(snapshot)
         val business = snapshot.businesses.firstOrNull {
             it.id == entry?.businessId
         }
@@ -105,6 +110,9 @@ fun NavGraphBuilder.customerNavGraph(
             business = business,
             entry = entry,
             position = position,
+            estimatedWaitMinutes = if (business != null && entry?.status == QueueStatus.WAITING) {
+                QueuePolicy.estimatedWaitMinutes(business, snapshot.entries, entry.partySize, entry.id)
+            } else null,
             error = error,
             onLeave = { entry?.let { queueViewModel.leave(it.id) } },
             onBrowse = { navController.popBackStack(Routes.CUSTOMER, false) },

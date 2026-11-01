@@ -71,6 +71,41 @@ class QueueViewModel(
         }
     }
 
+    fun currentEntry(snapshot: QueueSnapshot): QueueEntry? {
+        return activeEntry(snapshot) ?: snapshot.entries.lastOrNull {
+            it.customerUid == DEMO_CUSTOMER_UID
+        }
+    }
+
+    fun addWalkIn(businessId: String, name: String, size: Int): Boolean =
+        staffAction { repository.addWalkIn(businessId, name, size) }
+
+    fun callParty(businessId: String, tableId: String?, entryId: String? = null): Boolean =
+        staffAction { repository.callParty(businessId, tableId, entryId) }
+
+    fun seat(businessId: String, entryId: String): Boolean =
+        staffAction { repository.seat(businessId, entryId) }
+
+    fun remove(businessId: String, entryId: String): Boolean =
+        staffAction { repository.remove(businessId, entryId) }
+
+    fun releaseTable(businessId: String, tableId: String): Boolean =
+        staffAction { repository.releaseTable(businessId, tableId) }
+
+    fun setQueueOpen(businessId: String, open: Boolean): Boolean =
+        staffAction { repository.setQueueOpen(businessId, open) }
+
+    private fun staffAction(action: () -> Unit): Boolean {
+        clearError()
+        return try {
+            action()
+            true
+        } catch (exception: IllegalArgumentException) {
+            mutableError.value = exception.message ?: "Could not update this queue."
+            false
+        }
+    }
+
     fun clearError() {
         mutableError.value = null
     }

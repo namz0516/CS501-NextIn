@@ -32,6 +32,7 @@ fun QueueStatusScreen(
     business: Business?,
     entry: QueueEntry?,
     position: Int?,
+    estimatedWaitMinutes: Int?,
     error: String?,
     onLeave: () -> Unit,
     onBrowse: () -> Unit,
@@ -76,7 +77,9 @@ fun QueueStatusScreen(
                     QueueStatus.WAITING -> "Waiting"
                     QueueStatus.CALLED -> "Called"
                     QueueStatus.EXPIRED -> "Expired"
-                    else -> "Completed"
+                    QueueStatus.SEATED -> "Seated"
+                    QueueStatus.LEFT -> "Left"
+                    QueueStatus.REMOVED -> "Removed"
                 }
                 Text("Status: $status")
 
@@ -84,7 +87,9 @@ fun QueueStatusScreen(
                     Text("Approximate position: #$position")
                 }
 
-                Text("Estimated wait unavailable")
+                if (entry.status == QueueStatus.WAITING) {
+                    Text(estimatedWaitMinutes?.let { "Approximate wait: ~$it min" } ?: "Estimated wait unavailable")
+                }
                 Text(
                     text = "Restaurant seating can depend on party size and open tables.",
                     style = MaterialTheme.typography.bodySmall
@@ -97,11 +102,13 @@ fun QueueStatusScreen(
                     )
                 }
 
-                Button(
-                    onClick = { confirmLeave = true },
-                    modifier = Modifier.fillMaxWidth()
-                ) {
-                    Text("Leave queue")
+                if (entry.status in setOf(QueueStatus.WAITING, QueueStatus.CALLED, QueueStatus.EXPIRED)) {
+                    Button(onClick = { confirmLeave = true }, modifier = Modifier.fillMaxWidth()) {
+                        Text("Leave queue")
+                    }
+                } else {
+                    Text("No active queue")
+                    Button(onClick = onBrowse) { Text("Browse businesses") }
                 }
             }
         }

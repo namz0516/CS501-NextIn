@@ -53,6 +53,6 @@ fun AppNavigation(
             queueViewModel = queueViewModel
         )
 
-        staffNavGraph(navController)
+        staffNavGraph(navController, queueViewModel)
     }
 }
