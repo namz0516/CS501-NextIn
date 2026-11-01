@@ -15,6 +15,12 @@ object Routes {
     const val STAFF = "staff"
 
     const val BUSINESS_DETAILS = "business/{businessId}"
+    const val JOIN_QUEUE = "business/{businessId}/join"
+    const val MY_QUEUE = "my_queue"
+
+    fun joinQueue(businessId: String): String {
+        return "business/${Uri.encode(businessId)}/join"
+    }
 
     fun businessDetails(businessId: String): String {
         return "business/${Uri.encode(businessId)}"

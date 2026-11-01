@@ -6,6 +6,8 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.Button
+import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Scaffold
@@ -22,6 +24,7 @@ import com.example.nextin.data.model.BusinessType
 @Composable
 fun BusinessDetailsScreen(
     business: Business?,
+    onJoin: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -105,6 +108,14 @@ fun BusinessDetailsScreen(
                     text = business.description,
                     style = MaterialTheme.typography.bodyLarge
                 )
+
+                Button(
+                    onClick = onJoin,
+                    enabled = business.queueOpen,
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(if (business.queueOpen) "Join queue" else "Queue closed")
+                }
 
                 if (business.type == BusinessType.RESTAURANT) {
                     Text(

@@ -27,12 +27,16 @@ import com.example.nextin.data.model.BusinessType
 fun CustomerHomeScreen(
     businesses: List<Business>,
     onBusinessClick: (String) -> Unit,
+    onMyQueue: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
         topBar = {
             TopAppBar(
                 title = { Text("Find a Business") },
+                actions = {
+                    TextButton(onClick = onMyQueue) { Text("My queue") }
+                },
                 navigationIcon = {
                     TextButton(onClick = onBack) {
                         Text("Back")
