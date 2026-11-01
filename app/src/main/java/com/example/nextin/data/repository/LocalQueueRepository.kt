@@ -1,10 +1,13 @@
 package com.example.nextin.data.repository
 
 import com.example.nextin.data.model.Business
+import com.example.nextin.data.model.BusinessType
 import com.example.nextin.data.model.QueueEntry
 import com.example.nextin.data.model.QueueSnapshot
 import com.example.nextin.data.model.QueueSource
 import com.example.nextin.data.model.QueueStatus
+import com.example.nextin.data.model.SeatingMode
+import com.example.nextin.domain.queue.QueuePolicy
 import com.example.nextin.domain.validation.JoinQueueValidator
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -12,12 +15,11 @@ import kotlinx.coroutines.flow.asStateFlow
 import java.util.UUID
 
 class LocalQueueRepository(
-    initialBusinesses: List<Business>
+    initialBusinesses: List<Business>,
+    private val nowMillis: () -> Long = System::currentTimeMillis
 ) {
     private val mutableState = MutableStateFlow(
-        QueueSnapshot(
-            businesses = initialBusinesses.toList()
-        )
+        QueueSnapshot(businesses = initialBusinesses.toList())
     )
 
     val state: StateFlow<QueueSnapshot> = mutableState.asStateFlow()
@@ -29,30 +31,16 @@ class LocalQueueRepository(
         name: String,
         partySize: Int
     ): QueueEntry {
-        require(customerUid.isNotBlank()) {
-            "Customer ID is required."
-        }
-
+        require(customerUid.isNotBlank()) { "Customer ID is required." }
         val snapshot = mutableState.value
-
-        val business = snapshot.businesses.firstOrNull {
-            it.id == businessId
-        } ?: throw IllegalArgumentException("Business not found.")
-
+        val business = requireBusiness(snapshot, businessId)
         val hasActiveEntry = snapshot.entries.any {
             it.customerUid == customerUid && isActive(it)
         }
-
         val error = JoinQueueValidator.validate(
-            business = business,
-            name = name,
-            partySize = partySize,
-            hasActiveEntry = hasActiveEntry
+            business, name, partySize, hasActiveEntry
         )
-
-        if (error != null) {
-            throw IllegalArgumentException(error)
-        }
+        if (error != null) throw IllegalArgumentException(error)
 
         val entry = QueueEntry(
             id = UUID.randomUUID().toString(),
@@ -62,73 +50,210 @@ class LocalQueueRepository(
             partySize = partySize,
             source = QueueSource.APP,
             status = QueueStatus.WAITING,
-            joinedAtMillis = System.currentTimeMillis()
+            joinedAtMillis = nowMillis()
         )
-
-        mutableState.value = snapshot.copy(
-            entries = snapshot.entries + entry
-        )
-
+        mutableState.value = snapshot.copy(entries = snapshot.entries + entry)
         return entry
     }
 
     @Synchronized
-    fun leave(
-        entryId: String,
-        customerUid: String
-    ) {
+    fun leave(entryId: String, customerUid: String) {
         val snapshot = mutableState.value
-
-        val entry = snapshot.entries.firstOrNull {
-            it.id == entryId
-        } ?: throw IllegalArgumentException("Queue entry not found.")
-
+        val entry = snapshot.entries.firstOrNull { it.id == entryId }
+            ?: throw IllegalArgumentException("Queue entry not found.")
         require(entry.customerUid == customerUid) {
             "You can only leave your own queue."
         }
-
-        require(isActive(entry)) {
-            "This queue entry is already completed."
-        }
-
-        val updatedEntries = snapshot.entries.map {
-            if (it.id == entryId) {
-                it.copy(
-                    status = QueueStatus.LEFT,
-                    completedAtMillis = System.currentTimeMillis()
-                )
-            } else {
-                it
-            }
-        }
-
-        val updatedBusinesses = snapshot.businesses.map { business ->
-            if (business.id == entry.businessId) {
-                business.copy(
-                    tables = business.tables.map { table ->
-                        if (table.occupiedByEntryId == entryId) {
-                            table.copy(occupiedByEntryId = null)
-                        } else {
-                            table
-                        }
-                    }
-                )
-            } else {
-                business
-            }
-        }
+        require(isActive(entry)) { "This queue entry is already completed." }
 
         mutableState.value = snapshot.copy(
-            businesses = updatedBusinesses,
-            entries = updatedEntries
+            businesses = releaseTables(snapshot.businesses, entry.id),
+            entries = snapshot.entries.map {
+                if (it.id == entryId) it.copy(
+                    status = QueueStatus.LEFT,
+                    completedAtMillis = nowMillis()
+                ) else it
+            }
         )
+    }
+
+    @Synchronized
+    fun addWalkIn(businessId: String, name: String, partySize: Int): QueueEntry {
+        val snapshot = mutableState.value
+        val business = requireBusiness(snapshot, businessId)
+        val error = JoinQueueValidator.validate(business, name, partySize)
+        if (error != null) throw IllegalArgumentException(error)
+
+        val entry = QueueEntry(
+            id = UUID.randomUUID().toString(),
+            businessId = businessId,
+            customerUid = null,
+            name = name.trim(),
+            partySize = partySize,
+            source = QueueSource.WALK_IN,
+            joinedAtMillis = nowMillis()
+        )
+        mutableState.value = snapshot.copy(entries = snapshot.entries + entry)
+        return entry
+    }
+
+    @Synchronized
+    fun callParty(
+        businessId: String,
+        tableId: String? = null,
+        entryId: String? = null
+    ): QueueEntry {
+        val snapshot = mutableState.value
+        val business = requireBusiness(snapshot, businessId)
+        val line = QueuePolicy.waiting(businessId, snapshot.entries)
+        val party = if (entryId == null) {
+            QueuePolicy.suggest(business, snapshot.entries, tableId)
+                ?: throw IllegalArgumentException("No eligible waiting party for the open tables.")
+        } else {
+            line.firstOrNull { it.id == entryId }
+                ?: throw IllegalArgumentException("That party is not waiting at this business.")
+        }
+
+        val table = if (business.type == BusinessType.RESTAURANT) {
+            business.tables.filter {
+                it.occupiedByEntryId == null && it.capacity >= party.partySize &&
+                        (tableId == null || it.id == tableId)
+            }.minByOrNull { it.capacity }
+        } else null
+
+        require(business.type != BusinessType.RESTAURANT || table != null) {
+            "Choose an open table that fits this party."
+        }
+
+        val called = party.copy(
+            status = QueueStatus.CALLED,
+            calledAtMillis = nowMillis(),
+            confirmedArrival = false,
+            tableId = table?.id
+        )
+        val earlierIds = line.takeWhile { it.id != party.id }.map { it.id }.toSet()
+
+        mutableState.value = snapshot.copy(
+            businesses = snapshot.businesses.map { current ->
+                if (current.id == businessId) current.copy(
+                    tables = current.tables.map {
+                        if (it.id == table?.id) it.copy(occupiedByEntryId = party.id)
+                        else it
+                    }
+                ) else current
+            },
+            entries = snapshot.entries.map {
+                when {
+                    it.id == party.id -> called
+                    business.type == BusinessType.RESTAURANT &&
+                            business.settings.seatingMode == SeatingMode.TABLE_FIT &&
+                            it.id in earlierIds -> it.copy(skipCount = it.skipCount + 1)
+                    else -> it
+                }
+            }
+        )
+        return called
+    }
+
+    @Synchronized
+    fun seat(businessId: String, entryId: String) {
+        val snapshot = mutableState.value
+        val business = requireBusiness(snapshot, businessId)
+        val entry = requireEntry(snapshot, businessId, entryId)
+        require(entry.status in setOf(QueueStatus.CALLED, QueueStatus.EXPIRED)) {
+            "Call the party before marking it seated."
+        }
+        require(business.type != BusinessType.RESTAURANT || business.tables.any {
+            it.id == entry.tableId && it.occupiedByEntryId == entry.id
+        }) { "This party has no reserved table." }
+
+        mutableState.value = snapshot.copy(
+            entries = snapshot.entries.map {
+                if (it.id == entryId) it.copy(
+                    status = QueueStatus.SEATED,
+                    completedAtMillis = nowMillis()
+                ) else it
+            }
+        )
+    }
+
+    @Synchronized
+    fun remove(businessId: String, entryId: String) {
+        val snapshot = mutableState.value
+        val entry = requireEntry(snapshot, businessId, entryId)
+        require(isActive(entry)) { "This queue entry is already completed." }
+        mutableState.value = snapshot.copy(
+            businesses = releaseTables(snapshot.businesses, entryId),
+            entries = snapshot.entries.map {
+                if (it.id == entryId) it.copy(
+                    status = QueueStatus.REMOVED,
+                    completedAtMillis = nowMillis()
+                ) else it
+            }
+        )
+    }
+
+    @Synchronized
+    fun releaseTable(businessId: String, tableId: String) {
+        val snapshot = mutableState.value
+        val business = requireBusiness(snapshot, businessId)
+        val table = business.tables.firstOrNull { it.id == tableId }
+            ?: throw IllegalArgumentException("Table not found.")
+        require(snapshot.entries.none {
+            it.id == table.occupiedByEntryId && isActive(it)
+        }) { "Seat or remove the called party before reopening this table." }
+
+        mutableState.value = snapshot.copy(
+            businesses = snapshot.businesses.map {
+                if (it.id == businessId) it.copy(
+                    tables = it.tables.map { current ->
+                        if (current.id == tableId) current.copy(occupiedByEntryId = null)
+                        else current
+                    }
+                ) else it
+            }
+        )
+    }
+
+    @Synchronized
+    fun setQueueOpen(businessId: String, isOpen: Boolean) {
+        val snapshot = mutableState.value
+        requireBusiness(snapshot, businessId)
+        mutableState.value = snapshot.copy(
+            businesses = snapshot.businesses.map {
+                if (it.id == businessId) it.copy(queueOpen = isOpen) else it
+            }
+        )
+    }
+
+    private fun requireBusiness(snapshot: QueueSnapshot, id: String): Business {
+        return snapshot.businesses.firstOrNull { it.id == id }
+            ?: throw IllegalArgumentException("Business not found.")
+    }
+
+    private fun requireEntry(
+        snapshot: QueueSnapshot,
+        businessId: String,
+        entryId: String
+    ): QueueEntry {
+        requireBusiness(snapshot, businessId)
+        return snapshot.entries.firstOrNull {
+            it.id == entryId && it.businessId == businessId
+        } ?: throw IllegalArgumentException("Entry not found for this business.")
+    }
+
+    private fun releaseTables(businesses: List<Business>, entryId: String): List<Business> {
+        return businesses.map { business ->
+            business.copy(tables = business.tables.map {
+                if (it.occupiedByEntryId == entryId) it.copy(occupiedByEntryId = null)
+                else it
+            })
+        }
     }
 
     private fun isActive(entry: QueueEntry): Boolean {
         return entry.status in setOf(
-            QueueStatus.WAITING,
-            QueueStatus.CALLED,
-            QueueStatus.EXPIRED
+            QueueStatus.WAITING, QueueStatus.CALLED, QueueStatus.EXPIRED
         )
     }
 }
