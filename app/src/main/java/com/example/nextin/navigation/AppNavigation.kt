@@ -1,11 +1,13 @@
 package com.example.nextin.navigation
 
+import android.net.Uri
 import androidx.compose.runtime.Composable
+import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
+import com.example.nextin.ui.queue.QueueViewModel
 import com.example.nextin.ui.welcome.WelcomeScreen
-import android.net.Uri
 
 object Routes {
     const val WELCOME = "welcome"
@@ -20,16 +22,31 @@ object Routes {
 }
 
 @Composable
-fun AppNavigation() {
+fun AppNavigation(
+    queueViewModel: QueueViewModel = viewModel()
+) {
     val navController = rememberNavController()
-    NavHost(navController = navController, startDestination = Routes.WELCOME) {
+
+    NavHost(
+        navController = navController,
+        startDestination = Routes.WELCOME
+    ) {
         composable(Routes.WELCOME) {
             WelcomeScreen(
-                onCustomerClick = { navController.navigate(Routes.CUSTOMER) },
-                onStaffClick = { navController.navigate(Routes.STAFF) }
+                onCustomerClick = {
+                    navController.navigate(Routes.CUSTOMER)
+                },
+                onStaffClick = {
+                    navController.navigate(Routes.STAFF)
+                }
             )
         }
-        customerNavGraph(navController)
+
+        customerNavGraph(
+            navController = navController,
+            queueViewModel = queueViewModel
+        )
+
         staffNavGraph(navController)
     }
 }

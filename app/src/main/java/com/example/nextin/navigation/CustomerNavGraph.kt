@@ -1,20 +1,26 @@
 package com.example.nextin.navigation
 
+import androidx.compose.runtime.getValue
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
 import androidx.navigation.NavHostController
 import androidx.navigation.NavType
 import androidx.navigation.compose.composable
 import androidx.navigation.navArgument
-import com.example.nextin.data.sample.SampleBusinessData
 import com.example.nextin.ui.customer.BusinessDetailsScreen
 import com.example.nextin.ui.customer.CustomerHomeScreen
+import com.example.nextin.ui.queue.QueueViewModel
 
 fun NavGraphBuilder.customerNavGraph(
-    navController: NavHostController
+    navController: NavHostController,
+    queueViewModel: QueueViewModel
 ) {
     composable(Routes.CUSTOMER) {
+        val snapshot by queueViewModel.state
+            .collectAsStateWithLifecycle()
+
         CustomerHomeScreen(
-            businesses = SampleBusinessData.businesses,
+            businesses = snapshot.businesses,
             onBusinessClick = { businessId ->
                 navController.navigate(
                     Routes.businessDetails(businessId)
@@ -34,11 +40,15 @@ fun NavGraphBuilder.customerNavGraph(
             }
         )
     ) { backStackEntry ->
+        val snapshot by queueViewModel.state
+            .collectAsStateWithLifecycle()
+
         val businessId = backStackEntry.arguments
             ?.getString("businessId")
 
-        val business = SampleBusinessData.businesses
-            .firstOrNull { it.id == businessId }
+        val business = snapshot.businesses.firstOrNull {
+            it.id == businessId
+        }
 
         BusinessDetailsScreen(
             business = business,
