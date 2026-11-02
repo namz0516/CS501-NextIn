@@ -1,5 +1,10 @@
 package com.example.nextin.ui.queue
 
+import androidx.lifecycle.viewModelScope
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
+import kotlinx.coroutines.launch
+import com.example.nextin.data.model.BusinessSettings
 import androidx.lifecycle.ViewModel
 import com.example.nextin.data.model.QueueEntry
 import com.example.nextin.data.model.QueueSnapshot
@@ -19,6 +24,32 @@ class QueueViewModel(
 
     private val mutableError = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = mutableError.asStateFlow()
+
+    private val mutableNow = MutableStateFlow(System.currentTimeMillis())
+    val now: StateFlow<Long> = mutableNow.asStateFlow()
+
+    init {
+        viewModelScope.launch {
+            while (isActive) {
+                mutableNow.value = System.currentTimeMillis()
+                try {
+                    repository.expireCalls(mutableNow.value)
+                } catch (exception: IllegalArgumentException) {
+                    mutableError.value = exception.message
+                }
+                delay(1000)
+            }
+        }
+    }
+
+    fun confirmArrival(entryId: String): Boolean =
+        staffAction { repository.confirmArrival(entryId, DEMO_CUSTOMER_UID) }
+
+    fun keepExpired(businessId: String, entryId: String): Boolean =
+        staffAction { repository.keepExpired(businessId, entryId) }
+
+    fun updateSettings(businessId: String, settings: BusinessSettings): Boolean =
+        staffAction { repository.updateSettings(businessId, settings) }
 
     fun activeEntry(snapshot: QueueSnapshot): QueueEntry? {
         return snapshot.entries.firstOrNull {

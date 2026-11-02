@@ -22,6 +22,7 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
+import com.example.nextin.domain.queue.GracePeriod
 import com.example.nextin.data.model.Business
 import com.example.nextin.data.model.QueueEntry
 import com.example.nextin.data.model.QueueStatus
@@ -32,6 +33,8 @@ fun QueueStatusScreen(
     business: Business?,
     entry: QueueEntry?,
     position: Int?,
+    nowMillis: Long,
+    onConfirm: () -> Unit,
     estimatedWaitMinutes: Int?,
     error: String?,
     onLeave: () -> Unit,
@@ -82,6 +85,22 @@ fun QueueStatusScreen(
                     QueueStatus.REMOVED -> "Removed"
                 }
                 Text("Status: $status")
+
+                if (entry.status == QueueStatus.CALLED) {
+                    if (entry.confirmedArrival) {
+                        Text("Arrival confirmed. Please check in with staff.")
+                    } else {
+                        val remaining = GracePeriod.remainingMillis(entry, business, nowMillis) ?: 0L
+                        val seconds = remaining / 1000
+                        Text("Confirm within %d:%02d".format(seconds / 60, seconds % 60))
+                        Button(onClick = onConfirm, enabled = remaining > 0) {
+                            Text("I'm here / on my way")
+                        }
+                    }
+                }
+                if (entry.status == QueueStatus.EXPIRED) {
+                    Text("The grace period ended. Please contact staff; your spot has not been automatically removed.")
+                }
 
                 if (position != null) {
                     Text("Approximate position: #$position")

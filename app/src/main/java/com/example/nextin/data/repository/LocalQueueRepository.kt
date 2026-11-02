@@ -1,6 +1,8 @@
 package com.example.nextin.data.repository
 
 import com.example.nextin.data.model.Business
+import com.example.nextin.data.model.BusinessSettings
+import com.example.nextin.domain.queue.GracePeriod
 import com.example.nextin.data.model.BusinessType
 import com.example.nextin.data.model.QueueEntry
 import com.example.nextin.data.model.QueueSnapshot
@@ -224,6 +226,69 @@ class LocalQueueRepository(
                 if (it.id == businessId) it.copy(queueOpen = isOpen) else it
             }
         )
+    }
+
+    @Synchronized
+    fun updateSettings(businessId: String, settings: BusinessSettings) {
+        val snapshot = mutableState.value
+        val business = requireBusiness(snapshot, businessId)
+        require(settings.averageServiceMinutes in 1..240) { "Average service must be 1–240 minutes." }
+        require(settings.gracePeriodMinutes in 1..30) { "Grace period must be 1–30 minutes." }
+        require(settings.skipLimit in 1..10) { "Skip limit must be 1–10." }
+        require(settings.maxPartySize in 1..8) { "Maximum party size must be 1–8." }
+        require(business.type != BusinessType.OTHER ||
+                (settings.seatingMode == SeatingMode.FCFS && settings.maxPartySize == 1)) {
+            "Service businesses use FCFS and individual customers."
+        }
+        require(business.type != BusinessType.RESTAURANT ||
+                business.tables.any { it.capacity >= settings.maxPartySize }) {
+            "The maximum party size must fit a table in this inventory."
+        }
+        mutableState.value = snapshot.copy(businesses = snapshot.businesses.map {
+            if (it.id == businessId) it.copy(settings = settings) else it
+        })
+    }
+
+    @Synchronized
+    fun expireCalls(atMillis: Long = nowMillis()) {
+        val snapshot = mutableState.value
+        val entries = snapshot.entries.map { entry ->
+            val business = requireBusiness(snapshot, entry.businessId)
+            if (GracePeriod.hasExpired(entry, business, atMillis)) {
+                entry.copy(status = QueueStatus.EXPIRED)
+            } else entry
+        }
+        if (entries != snapshot.entries) mutableState.value = snapshot.copy(entries = entries)
+    }
+
+    @Synchronized
+    fun confirmArrival(entryId: String, customerUid: String) {
+        val snapshot = mutableState.value
+        val entry = snapshot.entries.firstOrNull { it.id == entryId }
+            ?: throw IllegalArgumentException("Queue entry not found.")
+        require(entry.customerUid == customerUid) { "You can only confirm your own arrival." }
+        require(entry.status == QueueStatus.CALLED) { "This party is not awaiting confirmation. Please contact staff." }
+        if (entry.confirmedArrival) return
+        val business = requireBusiness(snapshot, entry.businessId)
+        val now = nowMillis()
+        if (GracePeriod.hasExpired(entry, business, now)) {
+            expireCalls(now)
+            throw IllegalArgumentException("The grace period ended. Please contact staff.")
+        }
+        mutableState.value = snapshot.copy(entries = snapshot.entries.map {
+            if (it.id == entryId) it.copy(confirmedArrival = true) else it
+        })
+    }
+
+    @Synchronized
+    fun keepExpired(businessId: String, entryId: String) {
+        val snapshot = mutableState.value
+        val entry = requireEntry(snapshot, businessId, entryId)
+        require(entry.status == QueueStatus.EXPIRED) { "Only expired parties can be kept with a fresh grace period." }
+        mutableState.value = snapshot.copy(entries = snapshot.entries.map {
+            if (it.id == entryId) it.copy(status = QueueStatus.CALLED,
+                calledAtMillis = nowMillis(), confirmedArrival = false) else it
+        })
     }
 
     private fun requireBusiness(snapshot: QueueSnapshot, id: String): Business {

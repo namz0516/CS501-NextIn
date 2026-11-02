@@ -89,6 +89,7 @@ fun NavGraphBuilder.customerNavGraph(
     }
 
     composable(Routes.MY_QUEUE) {
+        val now by queueViewModel.now.collectAsStateWithLifecycle()
         val snapshot by queueViewModel.state.collectAsStateWithLifecycle()
         val error by queueViewModel.error.collectAsStateWithLifecycle()
         val entry = queueViewModel.currentEntry(snapshot)
@@ -110,6 +111,8 @@ fun NavGraphBuilder.customerNavGraph(
             business = business,
             entry = entry,
             position = position,
+            nowMillis = now,
+            onConfirm = { entry?.let { queueViewModel.confirmArrival(it.id) } },
             estimatedWaitMinutes = if (business != null && entry?.status == QueueStatus.WAITING) {
                 QueuePolicy.estimatedWaitMinutes(business, snapshot.entries, entry.partySize, entry.id)
             } else null,
