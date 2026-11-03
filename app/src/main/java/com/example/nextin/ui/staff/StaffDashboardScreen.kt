@@ -1,5 +1,8 @@
 package com.example.nextin.ui.staff
 
+import androidx.compose.foundation.BorderStroke
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.sp
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.horizontalScroll
 import androidx.compose.foundation.layout.*
@@ -51,18 +54,28 @@ fun StaffDashboardScreen(
     var overrideId by rememberSaveable(business?.id) { mutableStateOf<String?>(null) }
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text("Staff Dashboard") }, navigationIcon = {
+        TopAppBar(title = { Text("Staff dashboard", fontWeight = FontWeight.Bold) }, navigationIcon = {
             TextButton(onClick = onBack) { Text("Back") }
         })
     }) { padding ->
         LazyColumn(
             modifier = Modifier.fillMaxSize().padding(padding),
-            contentPadding = PaddingValues(16.dp),
+            contentPadding = PaddingValues(20.dp),
             verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             item {
-                Text("Staff demo · Local device only", style = MaterialTheme.typography.labelLarge)
-                Text("Staff authentication is not connected yet.", style = MaterialTheme.typography.bodySmall)
+                Surface(
+                    color = MaterialTheme.colorScheme.secondaryContainer,
+                    shape = MaterialTheme.shapes.medium
+                ) {
+                    Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                        Text("Staff workspace", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer)
+                        Text("Local demo • Staff authentication is not connected yet.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSecondaryContainer)
+                    }
+                }
             }
             item {
                 Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -91,27 +104,46 @@ fun StaffDashboardScreen(
                             } == true
                 }
                 item {
-                    Text(business.name, style = MaterialTheme.typography.headlineSmall)
-                    TextButton(onClick = { onClearError(); showSettings = true }, enabled = !busy) { Text("Settings") }
-                    Text(if (business.type == BusinessType.OTHER) "FCFS · Individual customers" else
-                        "${business.settings.seatingMode} · Skip limit ${business.settings.skipLimit}")
-                    Text("${line.size} waiting · ${called.size} called · $seatedToday seated today")
-                }
-                item {
-                    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                        Text("Accepting arrivals", Modifier.weight(1f))
-                        Switch(
-                            checked = business.queueOpen,
-                            onCheckedChange = { onQueueOpen(business.id, it) },
-                            enabled = !busy,
-                            modifier = Modifier.semantics { contentDescription = "Accepting arrivals at ${business.name}" }
-                        )
+                    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Text(business.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                        Text(if (business.type == BusinessType.OTHER) "FCFS · Individual customers" else
+                            "${if (business.settings.seatingMode == SeatingMode.FCFS) "First come, first served" else "Table-fit seating"} · Skip limit ${business.settings.skipLimit}",
+                            style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                        OutlinedButton(onClick = { onClearError(); showSettings = true }, enabled = !busy) { Text("Queue settings") }
+                        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                            StaffStatCard("Waiting", line.size, Modifier.weight(1f))
+                            StaffStatCard("Called", called.size, Modifier.weight(1f))
+                            StaffStatCard("Seated today", seatedToday, Modifier.weight(1f))
+                        }
                     }
                 }
-                if (error != null) item { Text(error, color = MaterialTheme.colorScheme.error) }
+                item {
+                    Surface(color = MaterialTheme.colorScheme.surfaceVariant, shape = MaterialTheme.shapes.medium) {
+                        Row(Modifier.fillMaxWidth().padding(16.dp), verticalAlignment = Alignment.CenterVertically) {
+                            Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                                Text("Accepting arrivals", fontWeight = FontWeight.SemiBold)
+                                Text(if (business.queueOpen) "New customers can join" else "Queue closed to new entries",
+                                    style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Switch(
+                                checked = business.queueOpen,
+                                onCheckedChange = { onQueueOpen(business.id, it) },
+                                enabled = !busy,
+                                modifier = Modifier.semantics { contentDescription = "Accepting arrivals at ${business.name}" }
+                            )
+                        }
+                    }
+                }
+                if (error != null) item {
+                    Surface(color = MaterialTheme.colorScheme.errorContainer, shape = MaterialTheme.shapes.medium) {
+                        Text(error, Modifier.fillMaxWidth().padding(16.dp), color = MaterialTheme.colorScheme.onErrorContainer)
+                    }
+                }
                 if (business.type == BusinessType.RESTAURANT) {
                     item {
-                        Text("Tables", style = MaterialTheme.typography.titleLarge)
+                        Text("Table availability", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
+                        Text("Select a table to guide the next call.", style = MaterialTheme.typography.bodySmall,
+                            color = MaterialTheme.colorScheme.onSurfaceVariant)
                         Row(Modifier.horizontalScroll(rememberScrollState()), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                             FilterChip(selected = tableId == null, onClick = { tableId = null }, label = { Text("Any open") })
                             business.tables.forEach { table ->
@@ -137,27 +169,41 @@ fun StaffDashboardScreen(
                     }
                 }
                 item {
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
-                            Text("Suggested next", style = MaterialTheme.typography.titleLarge)
+                            StaffBadge("SUGGESTED NEXT")
                             if (suggested == null) Text(if (line.isEmpty()) "No waiting parties." else "No eligible party for the selected open tables.")
-                            else Text("${suggested.name} · Party of ${suggested.partySize}")
-                            Button(onClick = { onCall(business.id, tableId, null) }, enabled = suggested != null && !busy) {
+                            else {
+                                Text(suggested.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
+                                Text("Party of ${suggested.partySize}", color = MaterialTheme.colorScheme.onSurfaceVariant)
+                            }
+                            Button(onClick = { onCall(business.id, tableId, null) }, enabled = suggested != null && !busy,
+                                modifier = Modifier.fillMaxWidth().heightIn(min = 52.dp)) {
                                 Text("Call next")
                             }
                         }
                     }
                 }
-                if (called.isNotEmpty()) item { Text("Called parties", style = MaterialTheme.typography.titleLarge) }
+                if (called.isNotEmpty()) item { Text("Ready for arrival", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold) }
                 items(called, key = { "called-${it.id}" }) { entry ->
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text(entry.name, style = MaterialTheme.typography.titleMedium)
+                            Text(entry.name, style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                             Text("Party of ${entry.partySize} · ${entry.status}${entry.tableId?.let { " · $it" } ?: ""}")
-                            Text(if (entry.confirmedArrival) "Arrival confirmed" else "Awaiting arrival")
+                            StaffBadge(if (entry.confirmedArrival) "ARRIVAL CONFIRMED" else if (entry.status == QueueStatus.EXPIRED) "GRACE PERIOD ENDED" else "AWAITING ARRIVAL")
                             if (entry.status == QueueStatus.CALLED && !entry.confirmedArrival) {
                                 val seconds = (GracePeriod.remainingMillis(entry, business, nowMillis) ?: 0L) / 1000
-                                Text("%d:%02d remaining".format(seconds / 60, seconds % 60))
+                                Text("%d:%02d remaining".format(seconds / 60, seconds % 60),
+                                    style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.primary)
                             }
                             if (entry.status == QueueStatus.EXPIRED) {
                                 Text("Grace period ended; choose Keep, Seat, or Remove.")
@@ -171,17 +217,26 @@ fun StaffDashboardScreen(
                     }
                 }
                 item {
-                    Text("Waiting list", style = MaterialTheme.typography.titleLarge)
+                    Text("Waiting list", style = MaterialTheme.typography.titleLarge, fontWeight = FontWeight.Bold)
                     OutlinedButton(onClick = { onClearError(); showWalkIn = true }, enabled = business.queueOpen && !busy) {
                         Text("Add walk-in")
                     }
                 }
                 if (line.isEmpty()) item { Text("No one is waiting.") }
                 items(line, key = { "waiting-${it.id}" }) { entry ->
-                    Card(Modifier.fillMaxWidth()) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surface),
+                        border = BorderStroke(1.dp, MaterialTheme.colorScheme.outlineVariant)
+                    ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                            Text("${line.indexOf(entry) + 1}. ${entry.name}", style = MaterialTheme.typography.titleMedium)
-                            Text("Party of ${entry.partySize} · ${entry.source} · ${entry.skipCount} skips")
+                            Row(horizontalArrangement = Arrangement.spacedBy(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                                StaffBadge("#${line.indexOf(entry) + 1}")
+                                Text(entry.name, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
+                                    modifier = Modifier.weight(1f))
+                            }
+                            Text("Party of ${entry.partySize} · ${if (entry.source == QueueSource.APP) "App" else "Walk-in"} · ${entry.skipCount} skips",
+                                style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
                             if (business.type == BusinessType.RESTAURANT && entry.skipCount >= business.settings.skipLimit) Text("Priority for a fitting table")
                             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                                 TextButton(onClick = { overrideId = entry.id }, enabled = !busy) { Text("Call override") }
@@ -295,4 +350,32 @@ private fun SettingsDialog(
 private fun SettingsField(label: String, value: String, onChange: (String) -> Unit) {
     OutlinedTextField(value, onChange, label = { Text(label) }, singleLine = true,
         keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number))
+}
+
+@Composable
+private fun StaffStatCard(label: String, value: Int, modifier: Modifier = Modifier) {
+    Surface(
+        modifier = modifier,
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = MaterialTheme.shapes.medium
+    ) {
+        Column(Modifier.padding(horizontal = 10.dp, vertical = 16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Text(value.toString(), fontSize = 28.sp, fontWeight = FontWeight.Bold,
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+            Text(label, style = MaterialTheme.typography.labelMedium,
+                color = MaterialTheme.colorScheme.onPrimaryContainer)
+        }
+    }
+}
+
+@Composable
+private fun StaffBadge(label: String) {
+    Surface(
+        color = MaterialTheme.colorScheme.primaryContainer,
+        shape = MaterialTheme.shapes.small
+    ) {
+        Text(label, Modifier.padding(horizontal = 10.dp, vertical = 6.dp),
+            style = MaterialTheme.typography.labelMedium, fontWeight = FontWeight.Bold,
+            color = MaterialTheme.colorScheme.onPrimaryContainer)
+    }
 }
