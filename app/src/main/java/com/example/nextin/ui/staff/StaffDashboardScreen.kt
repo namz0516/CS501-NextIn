@@ -30,8 +30,8 @@ fun StaffDashboardScreen(
     error: String?,
     nowMillis: Long,
     onKeep: (String, String) -> Unit,
-    onSettings: (String, BusinessSettings) -> Boolean,
-    onAddWalkIn: (String, String, Int) -> Boolean,
+    onSettings: (String, BusinessSettings, () -> Unit) -> Unit,
+    onAddWalkIn: (String, String, Int, () -> Unit) -> Unit,
     onCall: (String, String?, String?) -> Unit,
     onSeat: (String, String) -> Unit,
     onRemove: (String, String) -> Unit,
@@ -195,12 +195,12 @@ fun StaffDashboardScreen(
     }
     if (showSettings && business != null) {
         SettingsDialog(business, error, busy, onDismiss = { showSettings = false }, onSave = { settings ->
-            if (onSettings(business.id, settings)) showSettings = false
+            onSettings(business.id, settings) { showSettings = false }
         })
     }
     if (showWalkIn && business != null) {
         WalkInDialog(business, error, busy, onDismiss = { showWalkIn = false }, onAdd = { name, size ->
-            if (onAddWalkIn(business.id, name, size)) showWalkIn = false
+            onAddWalkIn(business.id, name, size) { showWalkIn = false }
         })
     }
     if (removeId != null && business != null) {

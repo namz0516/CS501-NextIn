@@ -34,6 +34,7 @@ import com.example.nextin.data.model.BusinessType
 fun JoinQueueScreen(
     business: Business?,
     hasActiveEntry: Boolean,
+    busy: Boolean,
     error: String?,
     onJoin: (String, Int) -> Unit,
     onMyQueue: () -> Unit,
@@ -64,7 +65,7 @@ fun JoinQueueScreen(
             if (business == null) {
                 Text("Business not found. Please go back.")
             } else {
-                val canJoin = business.queueOpen && !hasActiveEntry
+                val canJoin = business.queueOpen && !hasActiveEntry && !busy
 
                 Text(
                     text = business.name,
@@ -126,11 +127,11 @@ fun JoinQueueScreen(
                     enabled = canJoin,
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text("Join queue")
+                    Text(if (busy) "Saving…" else "Join queue")
                 }
 
                 Text(
-                    text = "Demo mode: queue entries reset when the app process ends.",
+                    text = "Demo mode: this queue is saved on this device.",
                     style = MaterialTheme.typography.bodySmall
                 )
             }

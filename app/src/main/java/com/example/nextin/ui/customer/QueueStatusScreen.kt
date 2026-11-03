@@ -33,6 +33,7 @@ fun QueueStatusScreen(
     business: Business?,
     entry: QueueEntry?,
     position: Int?,
+    busy: Boolean,
     nowMillis: Long,
     onConfirm: () -> Unit,
     estimatedWaitMinutes: Int?,
@@ -93,7 +94,7 @@ fun QueueStatusScreen(
                         val remaining = GracePeriod.remainingMillis(entry, business, nowMillis) ?: 0L
                         val seconds = remaining / 1000
                         Text("Confirm within %d:%02d".format(seconds / 60, seconds % 60))
-                        Button(onClick = onConfirm, enabled = remaining > 0) {
+                        Button(onClick = onConfirm, enabled = remaining > 0 && !busy) {
                             Text("I'm here / on my way")
                         }
                     }
@@ -122,7 +123,7 @@ fun QueueStatusScreen(
                 }
 
                 if (entry.status in setOf(QueueStatus.WAITING, QueueStatus.CALLED, QueueStatus.EXPIRED)) {
-                    Button(onClick = { confirmLeave = true }, modifier = Modifier.fillMaxWidth()) {
+                    Button(onClick = { confirmLeave = true }, enabled = !busy, modifier = Modifier.fillMaxWidth()) {
                         Text("Leave queue")
                     }
                 } else {
@@ -143,7 +144,8 @@ fun QueueStatusScreen(
                     onClick = {
                         confirmLeave = false
                         onLeave()
-                    }
+                    },
+                    enabled = !busy
                 ) { Text("Leave") }
             },
             dismissButton = {

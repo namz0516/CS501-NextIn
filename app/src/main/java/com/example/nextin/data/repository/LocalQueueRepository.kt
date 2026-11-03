@@ -18,10 +18,12 @@ import java.util.UUID
 
 class LocalQueueRepository(
     initialBusinesses: List<Business>,
-    private val nowMillis: () -> Long = System::currentTimeMillis
+    private val nowMillis: () -> Long = System::currentTimeMillis,
+    initialEntries: List<QueueEntry> = emptyList(),
+    private val persist: (QueueSnapshot) -> Unit = {}
 ) {
     private val mutableState = MutableStateFlow(
-        QueueSnapshot(businesses = initialBusinesses.toList())
+        QueueSnapshot(businesses = initialBusinesses.toList(), entries = initialEntries.toList())
     )
 
     val state: StateFlow<QueueSnapshot> = mutableState.asStateFlow()
@@ -54,7 +56,7 @@ class LocalQueueRepository(
             status = QueueStatus.WAITING,
             joinedAtMillis = nowMillis()
         )
-        mutableState.value = snapshot.copy(entries = snapshot.entries + entry)
+        publish(snapshot.copy(entries = snapshot.entries + entry))
         return entry
     }
 
@@ -68,7 +70,7 @@ class LocalQueueRepository(
         }
         require(isActive(entry)) { "This queue entry is already completed." }
 
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             businesses = releaseTables(snapshot.businesses, entry.id),
             entries = snapshot.entries.map {
                 if (it.id == entryId) it.copy(
@@ -76,7 +78,7 @@ class LocalQueueRepository(
                     completedAtMillis = nowMillis()
                 ) else it
             }
-        )
+        ))
     }
 
     @Synchronized
@@ -95,7 +97,7 @@ class LocalQueueRepository(
             source = QueueSource.WALK_IN,
             joinedAtMillis = nowMillis()
         )
-        mutableState.value = snapshot.copy(entries = snapshot.entries + entry)
+        publish(snapshot.copy(entries = snapshot.entries + entry))
         return entry
     }
 
@@ -135,7 +137,7 @@ class LocalQueueRepository(
         )
         val earlierIds = line.takeWhile { it.id != party.id }.map { it.id }.toSet()
 
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             businesses = snapshot.businesses.map { current ->
                 if (current.id == businessId) current.copy(
                     tables = current.tables.map {
@@ -153,7 +155,7 @@ class LocalQueueRepository(
                     else -> it
                 }
             }
-        )
+        ))
         return called
     }
 
@@ -169,14 +171,14 @@ class LocalQueueRepository(
             it.id == entry.tableId && it.occupiedByEntryId == entry.id
         }) { "This party has no reserved table." }
 
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             entries = snapshot.entries.map {
                 if (it.id == entryId) it.copy(
                     status = QueueStatus.SEATED,
                     completedAtMillis = nowMillis()
                 ) else it
             }
-        )
+        ))
     }
 
     @Synchronized
@@ -184,7 +186,7 @@ class LocalQueueRepository(
         val snapshot = mutableState.value
         val entry = requireEntry(snapshot, businessId, entryId)
         require(isActive(entry)) { "This queue entry is already completed." }
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             businesses = releaseTables(snapshot.businesses, entryId),
             entries = snapshot.entries.map {
                 if (it.id == entryId) it.copy(
@@ -192,7 +194,7 @@ class LocalQueueRepository(
                     completedAtMillis = nowMillis()
                 ) else it
             }
-        )
+        ))
     }
 
     @Synchronized
@@ -205,7 +207,7 @@ class LocalQueueRepository(
             it.id == table.occupiedByEntryId && isActive(it)
         }) { "Seat or remove the called party before reopening this table." }
 
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             businesses = snapshot.businesses.map {
                 if (it.id == businessId) it.copy(
                     tables = it.tables.map { current ->
@@ -214,18 +216,18 @@ class LocalQueueRepository(
                     }
                 ) else it
             }
-        )
+        ))
     }
 
     @Synchronized
     fun setQueueOpen(businessId: String, isOpen: Boolean) {
         val snapshot = mutableState.value
         requireBusiness(snapshot, businessId)
-        mutableState.value = snapshot.copy(
+        publish(snapshot.copy(
             businesses = snapshot.businesses.map {
                 if (it.id == businessId) it.copy(queueOpen = isOpen) else it
             }
-        )
+        ))
     }
 
     @Synchronized
@@ -244,9 +246,9 @@ class LocalQueueRepository(
                 business.tables.any { it.capacity >= settings.maxPartySize }) {
             "The maximum party size must fit a table in this inventory."
         }
-        mutableState.value = snapshot.copy(businesses = snapshot.businesses.map {
+        publish(snapshot.copy(businesses = snapshot.businesses.map {
             if (it.id == businessId) it.copy(settings = settings) else it
-        })
+        }))
     }
 
     @Synchronized
@@ -258,7 +260,7 @@ class LocalQueueRepository(
                 entry.copy(status = QueueStatus.EXPIRED)
             } else entry
         }
-        if (entries != snapshot.entries) mutableState.value = snapshot.copy(entries = entries)
+        if (entries != snapshot.entries) publish(snapshot.copy(entries = entries))
     }
 
     @Synchronized
@@ -275,9 +277,9 @@ class LocalQueueRepository(
             expireCalls(now)
             throw IllegalArgumentException("The grace period ended. Please contact staff.")
         }
-        mutableState.value = snapshot.copy(entries = snapshot.entries.map {
+        publish(snapshot.copy(entries = snapshot.entries.map {
             if (it.id == entryId) it.copy(confirmedArrival = true) else it
-        })
+        }))
     }
 
     @Synchronized
@@ -285,10 +287,15 @@ class LocalQueueRepository(
         val snapshot = mutableState.value
         val entry = requireEntry(snapshot, businessId, entryId)
         require(entry.status == QueueStatus.EXPIRED) { "Only expired parties can be kept with a fresh grace period." }
-        mutableState.value = snapshot.copy(entries = snapshot.entries.map {
+        publish(snapshot.copy(entries = snapshot.entries.map {
             if (it.id == entryId) it.copy(status = QueueStatus.CALLED,
                 calledAtMillis = nowMillis(), confirmedArrival = false) else it
-        })
+        }))
+    }
+
+    private fun publish(next: QueueSnapshot) {
+        persist(next)
+        mutableState.value = next
     }
 
     private fun requireBusiness(snapshot: QueueSnapshot, id: String): Business {

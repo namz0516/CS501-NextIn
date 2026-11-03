@@ -1,6 +1,13 @@
 package com.example.nextin.navigation
 
 import android.net.Uri
+import androidx.compose.foundation.layout.*
+import androidx.compose.material3.*
+import androidx.compose.runtime.getValue
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.unit.dp
+import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.compose.runtime.Composable
 import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.compose.NavHost
@@ -31,6 +38,23 @@ object Routes {
 fun AppNavigation(
     queueViewModel: QueueViewModel = viewModel()
 ) {
+    val ready by queueViewModel.ready.collectAsStateWithLifecycle()
+    val loading by queueViewModel.loading.collectAsStateWithLifecycle()
+    val error by queueViewModel.error.collectAsStateWithLifecycle()
+    if (!ready) {
+        Column(Modifier.fillMaxSize().padding(24.dp), verticalArrangement = Arrangement.Center,
+            horizontalAlignment = Alignment.CenterHorizontally) {
+            if (loading) {
+                CircularProgressIndicator()
+                Text("Loading saved queues…")
+            } else {
+                Text(error ?: "Queues could not be loaded.")
+                Button(onClick = { queueViewModel.initialize() }) { Text("Retry") }
+            }
+        }
+        return
+    }
+
     val navController = rememberNavController()
 
     NavHost(

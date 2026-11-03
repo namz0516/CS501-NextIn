@@ -68,6 +68,7 @@ fun NavGraphBuilder.customerNavGraph(
         route = Routes.JOIN_QUEUE,
         arguments = listOf(navArgument("businessId") { type = NavType.StringType })
     ) { backStackEntry ->
+        val busy by queueViewModel.busy.collectAsStateWithLifecycle()
         val snapshot by queueViewModel.state.collectAsStateWithLifecycle()
         val error by queueViewModel.error.collectAsStateWithLifecycle()
         val id = backStackEntry.arguments?.getString("businessId")
@@ -78,10 +79,10 @@ fun NavGraphBuilder.customerNavGraph(
         JoinQueueScreen(
             business = business,
             hasActiveEntry = queueViewModel.activeEntry(snapshot) != null,
+            busy = busy,
             error = error,
             onJoin = { name, size ->
-                val entry = queueViewModel.join(id.orEmpty(), name, size)
-                if (entry != null) openMyQueue()
+                queueViewModel.join(id.orEmpty(), name, size) { openMyQueue() }
             },
             onMyQueue = { openMyQueue() },
             onBack = { navController.popBackStack() }
@@ -89,6 +90,7 @@ fun NavGraphBuilder.customerNavGraph(
     }
 
     composable(Routes.MY_QUEUE) {
+        val busy by queueViewModel.busy.collectAsStateWithLifecycle()
         val now by queueViewModel.now.collectAsStateWithLifecycle()
         val snapshot by queueViewModel.state.collectAsStateWithLifecycle()
         val error by queueViewModel.error.collectAsStateWithLifecycle()
@@ -111,6 +113,7 @@ fun NavGraphBuilder.customerNavGraph(
             business = business,
             entry = entry,
             position = position,
+            busy = busy,
             nowMillis = now,
             onConfirm = { entry?.let { queueViewModel.confirmArrival(it.id) } },
             estimatedWaitMinutes = if (business != null && entry?.status == QueueStatus.WAITING) {
