@@ -1,15 +1,19 @@
-
 # Local Android configuration
 local.properties
 
-# Gradle caches and build outputs
+# Gradle and Kotlin generated files
 .gradle/
+.kotlin/
 build/
 **/build/
 
-# IDE files
+# Android Studio settings
 .idea/
 *.iml
 
-# macOS
+# macOS files
 .DS_Store
+
+# Signing files
+*.jks
+*.keystore
