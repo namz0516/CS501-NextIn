@@ -176,7 +176,24 @@ fun StaffDashboardScreen(
                     ) {
                         Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
                             StaffBadge("SUGGESTED NEXT")
-                            if (suggested == null) Text(if (line.isEmpty()) "No waiting parties." else "No eligible party for the selected open tables.")
+                            if (suggested == null) {
+                                val selectedTable = business.tables.firstOrNull { it.id == tableId }
+                                val firstInLine = line.firstOrNull()
+                                Text(
+                                    when {
+                                        firstInLine == null -> "No waiting parties."
+                                        business.tables.isEmpty() -> "No tables are set up for this restaurant."
+                                        selectedTable != null && selectedTable.occupiedByEntryId != null -> "This table is busy."
+                                        selectedTable == null && business.tables.all { it.occupiedByEntryId != null } -> "All tables are busy."
+                                        business.settings.seatingMode == SeatingMode.FCFS && selectedTable != null ->
+                                            "${firstInLine.name} (party of ${firstInLine.partySize}) is next in line but doesn't fit this table."
+                                        business.settings.seatingMode == SeatingMode.FCFS ->
+                                            "${firstInLine.name} (party of ${firstInLine.partySize}) is next in line but doesn't fit any open table."
+                                        selectedTable != null -> "No waiting party fits this table."
+                                        else -> "No waiting party fits the open tables."
+                                    }
+                                )
+                            }
                             else {
                                 Text(suggested.name, style = MaterialTheme.typography.headlineSmall, fontWeight = FontWeight.Bold)
                                 Text("Party of ${suggested.partySize}", color = MaterialTheme.colorScheme.onSurfaceVariant)
