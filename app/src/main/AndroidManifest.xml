@@ -9,4 +9,12 @@
             </intent-filter>
         </activity>
     </application>
+    <!-- allows nextin to communicate with google places -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- for approx location -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- for precise location -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>
