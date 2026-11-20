@@ -71,7 +71,7 @@ fun StaffDashboardScreen(
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Staff workspace", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        Text("Local demo • Staff authentication is not connected yet.",
+                        Text("Staff signed in • Queue data is stored on this device.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
