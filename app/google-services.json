@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "168073324647",
+    "project_id": "nextin-40daa",
+    "storage_bucket": "nextin-40daa.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:168073324647:android:98cc0b13157c7d9bee8cc2",
+        "android_client_info": {
+          "package_name": "com.example.nextin"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCpFQiX9VSQiDanXMxSG_MqMd6UGugBSoU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
