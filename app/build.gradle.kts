@@ -59,6 +59,8 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
 
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+
     // Google loc
     // google places api
     implementation("com.google.android.libraries.places:places:4.2.0")

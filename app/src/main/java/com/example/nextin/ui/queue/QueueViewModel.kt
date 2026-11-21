@@ -9,6 +9,7 @@ import com.example.nextin.data.model.*
 import com.example.nextin.data.repository.LocalQueueRepository
 import com.example.nextin.data.places.NearbyRestaurant
 import com.example.nextin.data.sample.SampleBusinessData
+import com.example.nextin.wear.PhoneQueueSync
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -25,6 +26,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val store = RoomQueueStore(NextInDatabase.getInstance(application))
     private var repository: LocalQueueRepository? = null
     private val mutex = Mutex()
+    private val wearSync = PhoneQueueSync(application)
 
     private val mutableState = MutableStateFlow(QueueSnapshot())
     val state: StateFlow<QueueSnapshot> = mutableState.asStateFlow()
@@ -49,7 +51,10 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                     if (repo != null) {
                         try {
                             withContext(Dispatchers.IO) { repo.expireCalls(mutableNow.value) }
-                            mutableState.value = repo.state.value
+                            if (mutableState.value != repo.state.value) {
+                                mutableState.value = repo.state.value
+                                wearSync.publish(repo.state.value)
+                            }
                         } catch (exception: CancellationException) {
                             throw exception
                         } catch (exception: Exception) {
@@ -81,6 +86,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     repository = repo
                     mutableState.value = repo.state.value
+                    wearSync.publish(repo.state.value)
                     mutableReady.value = true
                 } catch (exception: CancellationException) {
                     throw exception
@@ -163,6 +169,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                     val repo = requireNotNull(repository)
                     withContext(Dispatchers.IO) { action(repo) }
                     mutableState.value = repo.state.value
+                    wearSync.publish(repo.state.value)
                     onSuccess()
                 } catch (exception: CancellationException) {
                     throw exception
