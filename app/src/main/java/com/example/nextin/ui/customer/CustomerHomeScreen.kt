@@ -24,6 +24,7 @@ fun CustomerHomeScreen(
     entries: List<QueueEntry>,
     onBusinessClick: (String) -> Unit,
     onMyQueue: () -> Unit,
+    onNearbyRestaurants: () -> Unit,
     onBack: () -> Unit
 ) {
     Scaffold(
@@ -96,6 +97,12 @@ fun CustomerHomeScreen(
                             color = MaterialTheme.colorScheme.onPrimaryContainer
                         )
                     }
+                }
+            }
+
+            item {
+                OutlinedButton(onClick = onNearbyRestaurants, modifier = Modifier.fillMaxWidth()) {
+                    Text("Explore nearby restaurants")
                 }
             }
 

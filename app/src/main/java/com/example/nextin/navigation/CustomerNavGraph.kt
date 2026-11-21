@@ -1,6 +1,7 @@
 package com.example.nextin.navigation
 
 import androidx.compose.runtime.LaunchedEffect
+import com.example.nextin.ui.recommendations.NearbyRestaurantsScreen
 import androidx.compose.runtime.getValue
 import androidx.lifecycle.compose.collectAsStateWithLifecycle
 import androidx.navigation.NavGraphBuilder
@@ -38,8 +39,13 @@ fun NavGraphBuilder.customerNavGraph(
                 navController.navigate(Routes.businessDetails(id))
             },
             onMyQueue = { openMyQueue() },
+            onNearbyRestaurants = { navController.navigate(Routes.NEARBY) },
             onBack = { navController.popBackStack() }
         )
+    }
+
+    composable(Routes.NEARBY) {
+        NearbyRestaurantsScreen(onBack = { navController.popBackStack() })
     }
 
     composable(

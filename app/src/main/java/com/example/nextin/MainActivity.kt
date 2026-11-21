@@ -8,9 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.ui.Modifier
 import com.example.nextin.navigation.AppNavigation
 import com.example.nextin.ui.theme.NextInTheme
-import android.util.Log
 import com.google.android.libraries.places.api.Places
-import com.example.nextin.data.places.PlacesRepository
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -20,30 +18,6 @@ class MainActivity : ComponentActivity() {
             Places.initializeWithNewPlacesApiEnabled(
                 applicationContext,
                 BuildConfig.PLACES_API_KEY
-            )
-        }
-
-        //temporary test
-        if (Places.isInitialized()) {
-            val repository = PlacesRepository(applicationContext)
-
-            repository.searchNearbyRestaurants(
-                //vancouver coordinates for now
-                latitude = 49.2827,
-                longitude = -123.1207,
-                onSuccess = { restaurants ->
-                    Log.d("NextInPlaces", "Found ${restaurants.size} restaurants")
-
-                    restaurants.forEach { restaurant ->
-                        Log.d(
-                            "NextInPlaces",
-                            "${restaurant.name} - ${restaurant.address}"
-                        )
-                    }
-                },
-                onFailure = { exception ->
-                    Log.e("NextInPlaces", "Search failed", exception)
-                }
             )
         }
 
