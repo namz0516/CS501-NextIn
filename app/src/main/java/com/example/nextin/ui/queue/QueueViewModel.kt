@@ -7,6 +7,7 @@ import com.example.nextin.data.local.NextInDatabase
 import com.example.nextin.data.local.RoomQueueStore
 import com.example.nextin.data.model.*
 import com.example.nextin.data.repository.LocalQueueRepository
+import com.example.nextin.data.places.NearbyRestaurant
 import com.example.nextin.data.sample.SampleBusinessData
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -106,6 +107,31 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
 
     fun join(businessId: String, name: String, size: Int, onSuccess: () -> Unit) =
         execute(onSuccess) { it.join(businessId, DEMO_CUSTOMER_UID, name, size) }
+
+    /** Google Places metadata + an explicitly simulated local NextIn queue. */
+    fun registerDemoRestaurant(restaurant: NearbyRestaurant, onSuccess: (String) -> Unit) {
+        val id = "google-demo:${restaurant.id}"
+        val business = Business(
+            id = id,
+            name = restaurant.name,
+            address = restaurant.address,
+            description = "NextIn demonstration queue. Not operated by this restaurant.",
+            latitude = restaurant.latitude,
+            longitude = restaurant.longitude,
+            type = BusinessType.RESTAURANT,
+            queueOpen = true,
+            settings = BusinessSettings(
+                seatingMode = SeatingMode.FCFS,
+                maxPartySize = 8,
+                averageServiceMinutes = 25,
+                gracePeriodMinutes = 5
+            ),
+            tables = listOf(2, 4, 6, 8).mapIndexed { index, capacity ->
+                RestaurantTable(id = "${id}:table:${index}", capacity = capacity)
+            }
+        )
+        execute(onSuccess = { onSuccess(id) }) { it.registerDemoRestaurant(business) }
+    }
 
     fun leave(entryId: String) = execute { it.leave(entryId, DEMO_CUSTOMER_UID) }
 

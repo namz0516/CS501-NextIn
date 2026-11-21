@@ -27,6 +27,7 @@ fun CustomerHomeScreen(
     onNearbyRestaurants: () -> Unit,
     onBack: () -> Unit
 ) {
+    val visibleBusinesses = businesses.filter { it.id.startsWith("google-demo:") }
     Scaffold(
         topBar = {
             TopAppBar(
@@ -118,21 +119,21 @@ fun CustomerHomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "${businesses.size} available",
+                        text = "${visibleBusinesses.size} demo queues",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            if (businesses.isEmpty()) {
+            if (visibleBusinesses.isEmpty()) {
                 item {
-                    Text("No businesses are available right now.")
+                    Text("Find nearby restaurants to open a NextIn demo queue.")
                 }
             }
 
             items(
-                items = businesses,
+                items = visibleBusinesses,
                 key = { it.id }
             ) { business ->
                 val waitingCount = entries.count {
@@ -154,7 +155,7 @@ fun CustomerHomeScreen(
 
             item {
                 Text(
-                    text = "Demo businesses • Wait times are approximate",
+                    text = "Simulated NextIn queues only • Not actual restaurant wait times",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

@@ -45,7 +45,18 @@ fun NavGraphBuilder.customerNavGraph(
     }
 
     composable(Routes.NEARBY) {
-        NearbyRestaurantsScreen(onBack = { navController.popBackStack() })
+        val busy by queueViewModel.busy.collectAsStateWithLifecycle()
+        val error by queueViewModel.error.collectAsStateWithLifecycle()
+        NearbyRestaurantsScreen(
+            onBack = { navController.popBackStack() },
+            queueBusy = busy,
+            queueError = error,
+            onDemoQueue = { restaurant ->
+                queueViewModel.registerDemoRestaurant(restaurant) { id ->
+                    navController.navigate(Routes.businessDetails(id))
+                }
+            }
+        )
     }
 
     composable(

@@ -219,6 +219,15 @@ class LocalQueueRepository(
         ))
     }
 
+    /** Register a Google Places restaurant as a LOCAL demo queue, not a real restaurant queue. */
+    @Synchronized
+    fun registerDemoRestaurant(business: Business) {
+        require(business.id.startsWith("google-demo:")) { "Invalid demo restaurant ID" }
+        val snapshot = mutableState.value
+        if (snapshot.businesses.any { it.id == business.id }) return
+        publish(snapshot.copy(businesses = snapshot.businesses + business))
+    }
+
     @Synchronized
     fun setQueueOpen(businessId: String, isOpen: Boolean) {
         val snapshot = mutableState.value
