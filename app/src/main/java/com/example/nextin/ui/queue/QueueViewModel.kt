@@ -76,8 +76,15 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val repo = withContext(Dispatchers.IO) {
                         val saved = store.load()
-                        val snapshot = saved ?: QueueSnapshot(SampleBusinessData.businesses)
-                        if (saved == null) store.save(snapshot)
+                        val snapshot = if (saved == null) {
+                            QueueSnapshot(SampleBusinessData.businesses)
+                        } else {
+                            val missing = SampleBusinessData.businesses.filter { sample ->
+                                sample.id == "orca-sightseeing" && saved.businesses.none { it.id == sample.id }
+                            }
+                            if (missing.isEmpty()) saved else saved.copy(businesses = saved.businesses + missing)
+                        }
+                        if (saved == null || snapshot != saved) store.save(snapshot)
                         LocalQueueRepository(
                             initialBusinesses = snapshot.businesses,
                             initialEntries = snapshot.entries,

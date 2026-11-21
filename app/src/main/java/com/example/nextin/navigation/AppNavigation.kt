@@ -4,6 +4,7 @@ import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.unit.dp
@@ -37,7 +38,10 @@ object Routes {
 
 @Composable
 fun AppNavigation(
-    queueViewModel: QueueViewModel = viewModel()
+    queueViewModel: QueueViewModel = viewModel(),
+    pendingJoinBusinessId: String? = null,
+    onJoinLinkHandled: () -> Unit = {},
+    onScanQr: () -> Unit = {}
 ) {
     val ready by queueViewModel.ready.collectAsStateWithLifecycle()
     val loading by queueViewModel.loading.collectAsStateWithLifecycle()
@@ -58,6 +62,22 @@ fun AppNavigation(
 
     val navController = rememberNavController()
 
+    LaunchedEffect(pendingJoinBusinessId, ready) {
+        if (ready && pendingJoinBusinessId != null) {
+            // Only permit QR links to known local businesses, not arbitrary IDs.
+            val known = queueViewModel.state.value.businesses.any {
+                it.id == pendingJoinBusinessId
+            }
+            if (known) {
+                navController.navigate(Routes.joinQueue(pendingJoinBusinessId)) {
+                    launchSingleTop = true
+                }
+            }
+            onJoinLinkHandled()
+        }
+    }
+
+
     NavHost(
         navController = navController,
         startDestination = Routes.WELCOME
@@ -69,7 +89,8 @@ fun AppNavigation(
                 },
                 onStaffClick = {
                     navController.navigate(Routes.STAFF)
-                }
+                },
+                onScanQr = onScanQr
             )
         }
 

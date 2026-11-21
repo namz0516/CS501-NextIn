@@ -61,6 +61,9 @@ dependencies {
 
     implementation("com.google.android.gms:play-services-wearable:19.0.0")
 
+    // Google Code Scanner provides a camera-based QR scanner without an app camera permission.
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
     // Google loc
     // google places api
     implementation("com.google.android.libraries.places:places:4.2.0")
@@ -70,6 +73,7 @@ dependencies {
     implementation("androidx.datastore:datastore-preferences:1.1.7")
     //material comp, needed by sdk
     implementation("com.google.android.material:material:1.12.0")
+
 }
 
 

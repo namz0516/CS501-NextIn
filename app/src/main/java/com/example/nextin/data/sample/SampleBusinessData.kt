@@ -10,6 +10,20 @@ object SampleBusinessData {
 
     val businesses: List<Business> = listOf(
         Business(
+            id = "orca-sightseeing",
+            name = "Orca Sightseeing",
+            address = "Demo business — location not verified",
+            description = "NextIn QR check-in demonstration queue. Not affiliated with a real operator.",
+            type = BusinessType.OTHER,
+            queueOpen = true,
+            settings = BusinessSettings(
+                seatingMode = SeatingMode.FCFS,
+                maxPartySize = 8,
+                averageServiceMinutes = 20,
+                gracePeriodMinutes = 5
+            )
+        ),
+        Business(
             id = "olive-ember",
             name = "Olive & Ember",
             address = "100 Sample Street, Boston",
