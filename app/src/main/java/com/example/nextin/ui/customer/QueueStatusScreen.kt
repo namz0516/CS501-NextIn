@@ -173,6 +173,12 @@ fun QueueStatusScreen(
                     }
                 }
 
+                if (entry.status == QueueStatus.WAITING ||
+                    (entry.status == QueueStatus.CALLED && !entry.confirmedArrival)
+                ) {
+                    NotificationPrompt()
+                }
+
                 if (entry.status == QueueStatus.WAITING) {
                     QueueInfoCard(
                         title = "Estimated wait",

@@ -8,6 +8,9 @@ import com.example.nextin.data.local.RoomQueueStore
 import com.example.nextin.data.model.*
 import com.example.nextin.data.repository.LocalQueueRepository
 import com.example.nextin.data.sample.SampleBusinessData
+import com.example.nextin.domain.queue.QueueAlerts
+import com.example.nextin.domain.queue.ServerClock
+import com.example.nextin.notifications.QueueNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.delay
@@ -30,12 +33,15 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val store = RoomQueueStore(NextInDatabase.getInstance(application))
     private var repository: LocalQueueRepository? = null
     private val mutex = Mutex()
+    private val clock = ServerClock()
+    private val notifier = QueueNotifier(application)
+    private val sentReminders = mutableSetOf<String>()
 
     private val mutableState = MutableStateFlow(QueueSnapshot())
     val state: StateFlow<QueueSnapshot> = mutableState.asStateFlow()
     private val mutableError = MutableStateFlow<String?>(null)
     val error: StateFlow<String?> = mutableError.asStateFlow()
-    private val mutableNow = MutableStateFlow(System.currentTimeMillis())
+    private val mutableNow = MutableStateFlow(clock.now())
     val now: StateFlow<Long> = mutableNow.asStateFlow()
     private val mutableBusy = MutableStateFlow(false)
     val busy: StateFlow<Boolean> = mutableBusy.asStateFlow()
@@ -48,13 +54,14 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         initialize()
         viewModelScope.launch {
             while (isActive) {
-                mutableNow.value = System.currentTimeMillis()
+                mutableNow.value = clock.now()
                 mutex.withLock {
                     val repo = repository
                     if (repo != null) {
                         try {
                             withContext(Dispatchers.IO) { repo.expireCalls(mutableNow.value) }
-                            mutableState.value = repo.state.value
+                            publish(repo.state.value)
+                            sendReminderIfDue()
                         } catch (exception: CancellationException) {
                             throw exception
                         } catch (exception: Exception) {
@@ -88,6 +95,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                         if (saved == null) store.save(snapshot)
                         LocalQueueRepository(
                             initialBusinesses = snapshot.businesses,
+                            nowMillis = clock::now,
                             initialEntries = snapshot.entries,
                             persist = store::save
                         ).also { it.expireCalls() }
@@ -150,12 +158,12 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                 try {
                     val repo = requireNotNull(repository)
                     withContext(Dispatchers.IO) { action(repo) }
-                    mutableState.value = repo.state.value
+                    publish(repo.state.value)
                     onSuccess()
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Exception) {
-                    repository?.let { mutableState.value = it.state.value }
+                    repository?.let { publish(it.state.value) }
                     mutableError.value = exception.message ?: "Could not save this queue change."
                 } finally {
                     mutableBusy.value = false
@@ -165,5 +173,25 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearError() { mutableError.value = null }
+
+    fun syncServerTime(serverMillis: Long, requestStartedAt: Long, responseReceivedAt: Long) {
+        clock.sync(serverMillis, requestStartedAt, responseReceivedAt)
+        mutableNow.value = clock.now()
+    }
+
+    private fun publish(next: QueueSnapshot) {
+        val previous = mutableState.value
+        mutableState.value = next
+        if (!mutableReady.value || previous == next) return
+        QueueAlerts.detect(previous, next, customerUid).forEach(notifier::show)
+    }
+
+    private fun sendReminderIfDue() {
+        val reminder = QueueAlerts.reminder(
+            mutableState.value, customerUid, mutableNow.value, sentReminders
+        ) ?: return
+        sentReminders += reminder.key
+        notifier.show(reminder)
+    }
 
 }
