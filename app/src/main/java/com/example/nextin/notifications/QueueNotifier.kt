@@ -96,12 +96,17 @@ class QueueNotifier(context: Context) {
         fun needsRuntimePermission(): Boolean =
             Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU
 
+        fun permissionGranted(context: Context): Boolean =
+            !needsRuntimePermission() ||
+                    ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) ==
+                    PackageManager.PERMISSION_GRANTED
+
         fun canNotify(context: Context): Boolean {
-            if (needsRuntimePermission() &&
-                ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
-                PackageManager.PERMISSION_GRANTED
-            ) return false
-            return NotificationManagerCompat.from(context).areNotificationsEnabled()
+            if (!permissionGranted(context)) return false
+            val manager = NotificationManagerCompat.from(context)
+            if (!manager.areNotificationsEnabled()) return false
+            val channel = manager.getNotificationChannel(CHANNEL_ID) ?: return true
+            return channel.importance != NotificationManager.IMPORTANCE_NONE
         }
     }
 }

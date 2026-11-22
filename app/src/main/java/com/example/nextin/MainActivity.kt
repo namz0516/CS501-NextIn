@@ -17,7 +17,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
-        readOpenMyQueue(intent)
+        if (savedInstanceState == null) readOpenMyQueue(intent)
         setContent {
             NextInTheme {
                 Surface(modifier = Modifier.fillMaxSize()) {

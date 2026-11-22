@@ -1,8 +1,10 @@
 package com.example.nextin.ui.customer
 
 import android.Manifest
+import android.app.Activity
 import android.content.Intent
 import android.provider.Settings
+import androidx.activity.compose.LocalActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
@@ -20,37 +22,43 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.lifecycle.compose.LifecycleResumeEffect
+import androidx.core.app.ActivityCompat
+import com.example.nextin.notifications.AlertPreferences
 import com.example.nextin.notifications.QueueNotifier
 
 @Composable
-fun NotificationPrompt(modifier: Modifier = Modifier) {
+fun NotificationPrompt(entryId: String, modifier: Modifier = Modifier) {
     val context = LocalContext.current
+    val activity = LocalActivity.current
+    val preferences = remember { AlertPreferences(context) }
     var enabled by remember { mutableStateOf(QueueNotifier.canNotify(context)) }
-    var asked by rememberSaveable { mutableStateOf(false) }
-    var dismissed by rememberSaveable { mutableStateOf(false) }
+    var dismissed by remember(entryId) { mutableStateOf(preferences.promptDismissedFor(entryId)) }
+    var blocked by remember { mutableStateOf(permissionBlocked(activity, preferences)) }
 
     LifecycleResumeEffect(Unit) {
         enabled = QueueNotifier.canNotify(context)
+        blocked = permissionBlocked(activity, preferences)
         onPauseOrDispose { }
     }
 
     val launcher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission()
     ) {
-        asked = true
+        preferences.markPermissionAsked()
         enabled = QueueNotifier.canNotify(context)
+        blocked = permissionBlocked(activity, preferences)
     }
 
     if (enabled || dismissed) return
 
-    val openSettings = !QueueNotifier.needsRuntimePermission() || asked
+    val openSettings = !QueueNotifier.needsRuntimePermission() || blocked ||
+            QueueNotifier.permissionGranted(context)
 
     Card(
         modifier = modifier.fillMaxWidth(),
@@ -87,10 +95,19 @@ fun NotificationPrompt(modifier: Modifier = Modifier) {
                 }) {
                     Text(if (openSettings) "Open settings" else "Turn on notifications")
                 }
-                TextButton(onClick = { dismissed = true }) {
+                TextButton(onClick = {
+                    preferences.dismissPrompt(entryId)
+                    dismissed = true
+                }) {
                     Text("Not now")
                 }
             }
         }
     }
+}
+
+private fun permissionBlocked(activity: Activity?, preferences: AlertPreferences): Boolean {
+    if (!QueueNotifier.needsRuntimePermission() || activity == null) return false
+    return preferences.permissionAsked() &&
+            !ActivityCompat.shouldShowRequestPermissionRationale(activity, Manifest.permission.POST_NOTIFICATIONS)
 }

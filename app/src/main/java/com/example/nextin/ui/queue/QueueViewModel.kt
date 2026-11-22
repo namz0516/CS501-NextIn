@@ -10,6 +10,7 @@ import com.example.nextin.data.repository.LocalQueueRepository
 import com.example.nextin.data.sample.SampleBusinessData
 import com.example.nextin.domain.queue.QueueAlerts
 import com.example.nextin.domain.queue.ServerClock
+import com.example.nextin.notifications.AlertPreferences
 import com.example.nextin.notifications.QueueNotifier
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.Dispatchers
@@ -35,7 +36,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val mutex = Mutex()
     private val clock = ServerClock()
     private val notifier = QueueNotifier(application)
-    private val sentReminders = mutableSetOf<String>()
+    private val alertPreferences = AlertPreferences(application)
 
     private val mutableState = MutableStateFlow(QueueSnapshot())
     val state: StateFlow<QueueSnapshot> = mutableState.asStateFlow()
@@ -98,11 +99,14 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                             nowMillis = clock::now,
                             initialEntries = snapshot.entries,
                             persist = store::save
-                        ).also { it.expireCalls() }
+                        )
                     }
+                    val loaded = repo.state.value
+                    withContext(Dispatchers.IO) { repo.expireCalls() }
                     repository = repo
-                    mutableState.value = repo.state.value
+                    mutableState.value = loaded
                     mutableReady.value = true
+                    publish(repo.state.value)
                 } catch (exception: CancellationException) {
                     throw exception
                 } catch (exception: Exception) {
@@ -187,10 +191,16 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     private fun sendReminderIfDue() {
+        val snapshot = mutableState.value
+        val sent = alertPreferences.sentReminders()
         val reminder = QueueAlerts.reminder(
-            mutableState.value, customerUid, mutableNow.value, sentReminders
+            snapshot, customerUid, mutableNow.value, sent
         ) ?: return
-        sentReminders += reminder.key
+        val called = snapshot.entries
+            .filter { it.status == QueueStatus.CALLED }
+            .map { "${it.id}:${it.calledAtMillis}" }
+            .toSet()
+        alertPreferences.saveSentReminders(sent.filter { it in called }.toSet() + reminder.key)
         notifier.show(reminder)
     }
 

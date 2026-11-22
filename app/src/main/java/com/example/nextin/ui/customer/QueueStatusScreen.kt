@@ -176,7 +176,7 @@ fun QueueStatusScreen(
                 if (entry.status == QueueStatus.WAITING ||
                     (entry.status == QueueStatus.CALLED && !entry.confirmedArrival)
                 ) {
-                    NotificationPrompt()
+                    NotificationPrompt(entryId = entry.id)
                 }
 
                 if (entry.status == QueueStatus.WAITING) {
