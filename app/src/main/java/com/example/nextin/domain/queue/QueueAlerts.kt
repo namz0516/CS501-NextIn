@@ -96,7 +96,7 @@ object QueueAlerts {
         val remaining = GracePeriod.remainingMillis(entry, business, nowMillis) ?: return null
         if (remaining <= 0L || remaining > REMINDER_WINDOW_MILLIS) return null
 
-        val key = "${entry.id}:${entry.calledAtMillis}"
+        val key = AlertSchedule.key(entry.id, entry.calledAtMillis)
         if (key in alreadySent) return null
         return QueueAlert.Reminder(
             entryId = entry.id,

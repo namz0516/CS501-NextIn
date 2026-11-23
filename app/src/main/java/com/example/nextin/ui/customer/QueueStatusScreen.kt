@@ -177,6 +177,7 @@ fun QueueStatusScreen(
                     (entry.status == QueueStatus.CALLED && !entry.confirmedArrival)
                 ) {
                     NotificationPrompt(entryId = entry.id)
+                    ExactAlarmPrompt(entryId = entry.id)
                 }
 
                 if (entry.status == QueueStatus.WAITING) {

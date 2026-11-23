@@ -8,9 +8,12 @@ import com.example.nextin.data.local.NextInDatabase
 import com.example.nextin.data.local.RoomQueueStore
 import com.example.nextin.data.model.*
 import com.example.nextin.data.sample.SampleBusinessData
+import com.example.nextin.domain.queue.AlertSchedule
 import com.example.nextin.domain.queue.GracePeriod
+import com.example.nextin.domain.queue.QueueAlert
 import com.example.nextin.domain.queue.QueueAlerts
 import com.example.nextin.notifications.AlertPreferences
+import com.example.nextin.notifications.AlertScheduler
 import com.example.nextin.notifications.QueueNotifier
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
@@ -21,6 +24,7 @@ import kotlinx.coroutines.flow.*
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
 import kotlinx.coroutines.tasks.await
+import kotlin.math.abs
 
 class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val auth = FirebaseAuth.getInstance()
@@ -29,6 +33,9 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val clock = CloudClock()
     private val notifier = QueueNotifier(application)
     private val alertPreferences = AlertPreferences(application)
+    private val alertScheduler = AlertScheduler(application)
+    private var scheduledOffset: Long? = null
+    private var scheduledExact: Boolean? = null
     private val operationMutex = Mutex()
     private var customerUid = ""
     private var cache: RoomQueueStore? = null
@@ -104,6 +111,10 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                 mutableNow.value = clock.now()
                 checkExpiry()
                 sendReminderIfDue()
+                if (mutableReady.value && scheduledExact != null &&
+                    scheduledExact != AlertScheduler.exactAllowed(getApplication())) {
+                    syncAlarms(state.value)
+                }
                 delay(1000)
             }
         }
@@ -182,8 +193,9 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         val previous = mutableState.value
         mutableState.value = snapshot
         if (mutableReady.value && previous != snapshot) {
-            QueueAlerts.detect(previous, snapshot, customerUid).forEach(notifier::show)
+            QueueAlerts.detect(previous, snapshot, customerUid).forEach { showAlert(it, snapshot) }
         }
+        if (mutableReady.value) syncAlarms(snapshot)
         cache?.let { cacheWrites.trySend(it to snapshot) }
         mutableConnected.value = businessOnline && publicOnline && customerOnline
         val id = staffBusinessId
@@ -317,6 +329,48 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
 
     fun clearError() { mutableError.value = null }
 
+    private companion object {
+        const val OFFSET_TOLERANCE_MILLIS = 2_000L
+    }
+
+    private fun showAlert(alert: QueueAlert, snapshot: QueueSnapshot) {
+        if (alert is QueueAlert.Expired) {
+            val calledAt = snapshot.entries.firstOrNull { it.id == alert.entryId }?.calledAtMillis
+            val key = AlertSchedule.key(alert.entryId, calledAt)
+            if (key in alertPreferences.sentExpiries()) return
+            alertPreferences.markExpirySent(key)
+        }
+        notifier.show(alert)
+    }
+
+    private fun syncAlarms(snapshot: QueueSnapshot) {
+        val offset = clock.now() - System.currentTimeMillis()
+        val exact = AlertScheduler.exactAllowed(getApplication())
+        val offsetChanged = scheduledOffset?.let { abs(it - offset) > OFFSET_TOLERANCE_MILLIS } ?: true
+        val reschedule = offsetChanged || scheduledExact != exact
+        val saved = alertPreferences.scheduledAlarms()
+        val planned = mutableMapOf<String, String>()
+        snapshot.entries.filter { it.customerUid == customerUid }.forEach { entry ->
+            val business = snapshot.businesses.firstOrNull { it.id == entry.businessId } ?: return@forEach
+            val grace = business.settings.gracePeriodMinutes
+            val times = AlertSchedule.times(entry, grace)
+            if (times.isEmpty()) return@forEach
+            val signature = "${entry.calledAtMillis}:$grace"
+            planned[entry.id] = signature
+            if (!reschedule && saved[entry.id] == signature) return@forEach
+            times.forEach { time ->
+                alertScheduler.schedule(
+                    entry.id, business.id, business.name, requireNotNull(entry.calledAtMillis),
+                    time.kind, time.atMillis, offset
+                )
+            }
+        }
+        (saved.keys - planned.keys).forEach(alertScheduler::cancel)
+        if (planned != saved) alertPreferences.saveScheduledAlarms(planned)
+        scheduledOffset = offset
+        scheduledExact = exact
+    }
+
     private fun sendReminderIfDue() {
         if (!mutableReady.value) return
         val snapshot = mutableState.value
@@ -326,7 +380,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         ) ?: return
         val called = snapshot.entries
             .filter { it.status == QueueStatus.CALLED }
-            .map { "${it.id}:${it.calledAtMillis}" }
+            .map { AlertSchedule.key(it.id, it.calledAtMillis) }
             .toSet()
         alertPreferences.saveSentReminders(sent.filter { it in called }.toSet() + reminder.key)
         notifier.show(reminder)
