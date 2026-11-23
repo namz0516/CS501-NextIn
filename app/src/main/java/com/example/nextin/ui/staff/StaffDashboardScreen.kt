@@ -23,7 +23,6 @@ import com.example.nextin.data.model.*
 import com.example.nextin.domain.queue.GracePeriod
 import com.example.nextin.domain.queue.QueuePolicy
 import java.time.Instant
-import java.time.LocalDate
 import java.time.ZoneId
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -55,7 +54,7 @@ fun StaffDashboardScreen(
 
     Scaffold(topBar = {
         TopAppBar(title = { Text("Staff dashboard", fontWeight = FontWeight.Bold) }, navigationIcon = {
-            TextButton(onClick = onBack) { Text("Back") }
+            TextButton(onClick = onBack, enabled = !busy) { Text("Back") }
         })
     }) { padding ->
         LazyColumn(
@@ -71,7 +70,7 @@ fun StaffDashboardScreen(
                     Column(Modifier.fillMaxWidth().padding(16.dp), verticalArrangement = Arrangement.spacedBy(4.dp)) {
                         Text("Staff workspace", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.Bold,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
-                        Text("Staff signed in • Queue data is stored on this device.",
+                        Text("Live queue • Changes sync across connected devices.",
                             style = MaterialTheme.typography.bodySmall,
                             color = MaterialTheme.colorScheme.onSecondaryContainer)
                     }
@@ -100,7 +99,7 @@ fun StaffDashboardScreen(
                 val seatedToday = snapshot.entries.count {
                     it.businessId == business.id && it.status == QueueStatus.SEATED &&
                             it.completedAtMillis?.let { time ->
-                                Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate() == LocalDate.now()
+                                Instant.ofEpochMilli(time).atZone(ZoneId.systemDefault()).toLocalDate() == Instant.ofEpochMilli(nowMillis).atZone(ZoneId.systemDefault()).toLocalDate()
                             } == true
                 }
                 item {

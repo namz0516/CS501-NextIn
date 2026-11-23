@@ -231,7 +231,7 @@ fun JoinQueueScreen(
                 }
 
                 Text(
-                    text = "Demo mode • Your queue entry is saved on this device.",
+                    text = "An internet connection is needed to save your spot.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
