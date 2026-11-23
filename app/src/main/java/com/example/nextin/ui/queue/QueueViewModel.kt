@@ -9,6 +9,9 @@ import com.example.nextin.data.local.RoomQueueStore
 import com.example.nextin.data.model.*
 import com.example.nextin.data.sample.SampleBusinessData
 import com.example.nextin.domain.queue.GracePeriod
+import com.example.nextin.domain.queue.QueueAlerts
+import com.example.nextin.notifications.AlertPreferences
+import com.example.nextin.notifications.QueueNotifier
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
@@ -24,6 +27,8 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val firestore = FirebaseFirestore.getInstance()
     private val customerCloud = CloudQueueStore(firestore, auth)
     private val clock = CloudClock()
+    private val notifier = QueueNotifier(application)
+    private val alertPreferences = AlertPreferences(application)
     private val operationMutex = Mutex()
     private var customerUid = ""
     private var cache: RoomQueueStore? = null
@@ -98,6 +103,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
             while (isActive) {
                 mutableNow.value = clock.now()
                 checkExpiry()
+                sendReminderIfDue()
                 delay(1000)
             }
         }
@@ -173,7 +179,11 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
             ownEntries.filter { it.customerUid == customerUid }.associateBy { it.id })
             .values.sortedWith(compareBy<QueueEntry> { it.joinedAtMillis }.thenBy { it.id })
         val snapshot = QueueSnapshot(allBusinesses, entries)
+        val previous = mutableState.value
         mutableState.value = snapshot
+        if (mutableReady.value && previous != snapshot) {
+            QueueAlerts.detect(previous, snapshot, customerUid).forEach(notifier::show)
+        }
         cache?.let { cacheWrites.trySend(it to snapshot) }
         mutableConnected.value = businessOnline && publicOnline && customerOnline
         val id = staffBusinessId
@@ -306,6 +316,21 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     }
 
     fun clearError() { mutableError.value = null }
+
+    private fun sendReminderIfDue() {
+        if (!mutableReady.value) return
+        val snapshot = mutableState.value
+        val sent = alertPreferences.sentReminders()
+        val reminder = QueueAlerts.reminder(
+            snapshot, customerUid, mutableNow.value, sent
+        ) ?: return
+        val called = snapshot.entries
+            .filter { it.status == QueueStatus.CALLED }
+            .map { "${it.id}:${it.calledAtMillis}" }
+            .toSet()
+        alertPreferences.saveSentReminders(sent.filter { it in called }.toSet() + reminder.key)
+        notifier.show(reminder)
+    }
 
     private fun stopListeners() {
         listeners.forEach { it.remove() }

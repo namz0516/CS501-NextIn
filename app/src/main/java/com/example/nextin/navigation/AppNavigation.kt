@@ -3,6 +3,7 @@ package com.example.nextin.navigation
 import android.net.Uri
 import androidx.compose.foundation.layout.*
 import androidx.compose.material3.*
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -36,7 +37,9 @@ object Routes {
 
 @Composable
 fun AppNavigation(
-    queueViewModel: QueueViewModel = viewModel()
+    queueViewModel: QueueViewModel = viewModel(),
+    openMyQueue: Boolean = false,
+    onMyQueueOpened: () -> Unit = {}
 ) {
     val ready by queueViewModel.ready.collectAsStateWithLifecycle()
     val loading by queueViewModel.loading.collectAsStateWithLifecycle()
@@ -56,6 +59,22 @@ fun AppNavigation(
     }
 
     val navController = rememberNavController()
+
+    LaunchedEffect(openMyQueue) {
+        if (openMyQueue) {
+            if (navController.currentDestination?.route != Routes.MY_QUEUE) {
+                navController.navigate(Routes.CUSTOMER) {
+                    popUpTo(Routes.WELCOME)
+                    launchSingleTop = true
+                }
+                navController.navigate(Routes.MY_QUEUE) {
+                    popUpTo(Routes.CUSTOMER)
+                    launchSingleTop = true
+                }
+            }
+            onMyQueueOpened()
+        }
+    }
 
     NavHost(
         navController = navController,
