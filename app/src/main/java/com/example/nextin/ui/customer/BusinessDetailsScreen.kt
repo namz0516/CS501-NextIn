@@ -159,7 +159,7 @@ fun BusinessDetailsScreen(
                 }
 
                 Text(
-                    text = "Demo mode • Queue data is saved on this device.",
+                    text = "Queue changes require an internet connection.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )

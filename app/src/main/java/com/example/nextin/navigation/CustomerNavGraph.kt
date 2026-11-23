@@ -29,9 +29,11 @@ fun NavGraphBuilder.customerNavGraph(
     }
 
     composable(Routes.CUSTOMER) {
+        val connected by queueViewModel.connected.collectAsStateWithLifecycle()
         val snapshot by queueViewModel.state.collectAsStateWithLifecycle()
 
         CustomerHomeScreen(
+            connected = connected,
             businesses = snapshot.businesses,
             entries = snapshot.entries,
             onBusinessClick = { id ->

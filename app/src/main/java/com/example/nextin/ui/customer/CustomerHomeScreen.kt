@@ -24,7 +24,8 @@ fun CustomerHomeScreen(
     entries: List<QueueEntry>,
     onBusinessClick: (String) -> Unit,
     onMyQueue: () -> Unit,
-    onBack: () -> Unit
+    onBack: () -> Unit,
+    connected: Boolean = true
 ) {
     Scaffold(
         topBar = {
@@ -64,6 +65,12 @@ fun CustomerHomeScreen(
                         text = "Find your next spot",
                         style = MaterialTheme.typography.headlineMedium,
                         fontWeight = FontWeight.Bold
+                    )
+                    Text(
+                        text = if (connected) "Live queue updates"
+                            else "Connecting • Showing saved data",
+                        style = MaterialTheme.typography.labelLarge,
+                        color = MaterialTheme.colorScheme.primary
                     )
                     Text(
                         text = "Explore businesses and check the queue before joining.",

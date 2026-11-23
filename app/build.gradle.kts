@@ -3,6 +3,7 @@ plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
     id("org.jetbrains.kotlin.plugin.compose")
+    id("com.google.gms.google-services")
 }
 
 android {
@@ -41,8 +42,16 @@ dependencies {
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.10.1")
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
-}
 
+    // Keeps Firebase library versions compatible.
+    implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
+    // Provides customer and staff authentication.
+    implementation("com.google.firebase:firebase-auth")
+    // Provides shared queue storage and live updates.
+    implementation("com.google.firebase:firebase-firestore")
+    // Lets coroutines wait for Firebase operations without blocking the UI.
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1")
+}
 
 ksp {
     arg("room.schemaLocation", "$projectDir/schemas")
