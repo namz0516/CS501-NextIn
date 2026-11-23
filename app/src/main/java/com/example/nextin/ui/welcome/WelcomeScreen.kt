@@ -105,7 +105,7 @@ fun WelcomeScreen(onCustomerClick: () -> Unit, onStaffClick: () -> Unit) {
             }
 
             Text(
-                "Local demo • Staff sign-in is not connected yet.",
+                "Your spot, updated in real time.",
                 style = MaterialTheme.typography.bodySmall,
                 textAlign = TextAlign.Center,
                 color = MaterialTheme.colorScheme.onSurfaceVariant
