@@ -19,6 +19,7 @@ import com.google.android.libraries.places.api.Places
 class MainActivity : ComponentActivity() {
     private val pendingJoinBusiness = mutableStateOf<String?>(null)
 
+    //link that opens app
     private fun receiveJoinLink(intent: Intent?) {
         val uri = intent?.data ?: return
         if (uri.scheme == "nextin" && uri.host == "join") {
@@ -26,12 +27,14 @@ class MainActivity : ComponentActivity() {
         }
     }
 
+    //handle links when app already running
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
         setIntent(intent)
-        receiveJoinLink(intent)
+        receiveJoinLink(intent) //gets new business id
     }
 
+    //opens qr
     private fun scanQueueQr() {
         val options = GmsBarcodeScannerOptions.Builder()
             .setBarcodeFormats(Barcode.FORMAT_QR_CODE)
@@ -40,9 +43,11 @@ class MainActivity : ComponentActivity() {
         GmsBarcodeScanning.getClient(this, options).startScan()
             .addOnSuccessListener { barcode ->
                 val uri = barcode.rawValue?.let(android.net.Uri::parse)
-                if (uri?.scheme == "nextin" && uri.host == "join" &&
-                    uri.pathSegments.singleOrNull() == "orca-sightseeing") {
-                    pendingJoinBusiness.value = "orca-sightseeing"
+                if (uri?.scheme == "nextin" &&
+                    uri.host == "join" &&
+                    uri.pathSegments.size == 1) {
+
+                    pendingJoinBusiness.value = uri.pathSegments.first()
                 } else {
                     Toast.makeText(this, "This QR code is not a supported NextIn queue.", Toast.LENGTH_LONG).show()
                 }

@@ -64,16 +64,16 @@ fun AppNavigation(
 
     LaunchedEffect(pendingJoinBusinessId, ready) {
         if (ready && pendingJoinBusinessId != null) {
-            // Only permit QR links to known local businesses, not arbitrary IDs.
+            //only allow qr links to known businesses, not random IDs
             val known = queueViewModel.state.value.businesses.any {
                 it.id == pendingJoinBusinessId
             }
             if (known) {
                 navController.navigate(Routes.joinQueue(pendingJoinBusinessId)) {
-                    launchSingleTop = true
+                    launchSingleTop = true //if true then dest already at top
                 }
             }
-            onJoinLinkHandled()
+            onJoinLinkHandled() //clears pending qr dest
         }
     }
 

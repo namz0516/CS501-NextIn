@@ -1,4 +1,3 @@
-
 package com.example.nextin.data.places
 
 data class NearbyRestaurant(
@@ -6,5 +5,6 @@ data class NearbyRestaurant(
     val name: String,
     val address: String,
     val latitude: Double,
-    val longitude: Double
+    val longitude: Double,
+    val primaryType: String? = null
 )

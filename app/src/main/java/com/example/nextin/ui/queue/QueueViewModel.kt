@@ -26,6 +26,8 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private val store = RoomQueueStore(NextInDatabase.getInstance(application))
     private var repository: LocalQueueRepository? = null
     private val mutex = Mutex()
+
+    //phone synch object
     private val wearSync = PhoneQueueSync(application)
 
     private val mutableState = MutableStateFlow(QueueSnapshot())
@@ -53,6 +55,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                             withContext(Dispatchers.IO) { repo.expireCalls(mutableNow.value) }
                             if (mutableState.value != repo.state.value) {
                                 mutableState.value = repo.state.value
+                                //during init
                                 wearSync.publish(repo.state.value)
                             }
                         } catch (exception: CancellationException) {
@@ -93,6 +96,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                     }
                     repository = repo
                     mutableState.value = repo.state.value
+                    //after queue ops
                     wearSync.publish(repo.state.value)
                     mutableReady.value = true
                 } catch (exception: CancellationException) {
@@ -131,7 +135,31 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
             description = "NextIn demonstration queue. Not operated by this restaurant.",
             latitude = restaurant.latitude,
             longitude = restaurant.longitude,
-            type = BusinessType.RESTAURANT,
+            type = when (restaurant.primaryType) {
+                "restaurant", "meal_takeaway", "meal_delivery" ->
+                    BusinessType.RESTAURANT
+
+                "cafe", "coffee_shop", "tea_house",
+                "bubble_tea_store", "beverage_store",
+                "juice_shop" ->
+                    BusinessType.CAFE
+
+                "movie_theater" ->
+                    BusinessType.CINEMA
+
+                "store", "clothing_store", "shopping_mall",
+                "convenience_store", "book_store", "shoe_store",
+                "electronics_store", "supermarket" ->
+                    BusinessType.SHOP
+
+                "tourist_attraction", "travel_agency" ->
+                    BusinessType.TOURS_AND_ATTRACTIONS
+
+                "beauty_salon", "hair_salon", "nail_salon" ->
+                    BusinessType.SALON_AND_BEAUTY
+
+                else -> BusinessType.OTHER
+            },
             queueOpen = true,
             settings = BusinessSettings(
                 seatingMode = SeatingMode.FCFS,
@@ -176,6 +204,7 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                     val repo = requireNotNull(repository)
                     withContext(Dispatchers.IO) { action(repo) }
                     mutableState.value = repo.state.value
+                    //during expiry checks
                     wearSync.publish(repo.state.value)
                     onSuccess()
                 } catch (exception: CancellationException) {

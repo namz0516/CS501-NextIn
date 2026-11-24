@@ -15,7 +15,7 @@ class PlacesRepository(context: Context) {
     private val placesClient =
         Places.createClient(context.applicationContext)
 
-    /** Text Search (New): no GPS needed. Include a city/country for distant searches. */
+    //Search for businesses using a text query
     fun searchRestaurantsAnywhere(
         query: String,
         latitude: Double?,
@@ -27,7 +27,8 @@ class PlacesRepository(context: Context) {
             Place.Field.ID,
             Place.Field.DISPLAY_NAME,
             Place.Field.FORMATTED_ADDRESS,
-            Place.Field.LOCATION
+            Place.Field.LOCATION,
+            Place.Field.PRIMARY_TYPE
         )
         val builder = SearchByTextRequest.builder(query, fields)
             .setMaxResultCount(20)
@@ -36,6 +37,7 @@ class PlacesRepository(context: Context) {
         }
         val request = builder.build()
 
+        //converting google's businesses to our format
         placesClient.searchByText(request)
             .addOnSuccessListener { response ->
                 val results = response.places.mapNotNull { place ->
@@ -46,7 +48,8 @@ class PlacesRepository(context: Context) {
                         name = place.displayName.orEmpty(),
                         address = place.formattedAddress.orEmpty(),
                         latitude = location.latitude,
-                        longitude = location.longitude
+                        longitude = location.longitude,
+                        primaryType = place.primaryType
                     )
                 }
                 // Rank name relevance before distance. "Share Tea" and "Sharetea"
@@ -74,7 +77,7 @@ class PlacesRepository(context: Context) {
         return when {
             q.isEmpty() -> 3
             n == q -> 0
-            n.startsWith(q) || n.contains(q) -> 1
+            n.contains(q) -> 1
             else -> 2
         }
     }
@@ -102,11 +105,26 @@ class PlacesRepository(context: Context) {
             Place.Field.ID,
             Place.Field.DISPLAY_NAME,
             Place.Field.FORMATTED_ADDRESS,
-            Place.Field.LOCATION
+            Place.Field.LOCATION,
+            Place.Field.PRIMARY_TYPE
         )
 
         val request = SearchNearbyRequest.builder(bounds, fields)
-            .setIncludedTypes(listOf("restaurant"))
+            .setIncludedTypes(
+                listOf(
+                    "restaurant",
+                    "cafe",
+                    "coffee_shop",
+                    "movie_theater",
+                    "clothing_store",
+                    "store",
+                    "shopping_mall",
+                    "beauty_salon",
+                    "hair_salon",
+                    "nail_salon",
+                    "tourist_attraction"
+                )
+            )
             .setMaxResultCount(10)
             .build()
 
@@ -121,7 +139,8 @@ class PlacesRepository(context: Context) {
                         name = place.displayName.orEmpty(),
                         address = place.formattedAddress.orEmpty(),
                         latitude = location.latitude,
-                        longitude = location.longitude
+                        longitude = location.longitude,
+                        primaryType = place.primaryType
                     )
                 }
 

@@ -103,7 +103,7 @@ fun CustomerHomeScreen(
 
             item {
                 OutlinedButton(onClick = onNearbyRestaurants, modifier = Modifier.fillMaxWidth()) {
-                    Text("Explore nearby restaurants")
+                    Text("Explore places nearby")
                 }
             }
 
@@ -128,7 +128,7 @@ fun CustomerHomeScreen(
 
             if (visibleBusinesses.isEmpty()) {
                 item {
-                    Text("Find nearby restaurants to open a NextIn demo queue.")
+                    Text("Find nearby places to open a NextIn demo queue.")
                 }
             }
 
@@ -155,7 +155,7 @@ fun CustomerHomeScreen(
 
             item {
                 Text(
-                    text = "Simulated NextIn queues only • Not actual restaurant wait times",
+                    text = "Simulated NextIn queues only • Not actual business' wait times",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -219,9 +219,13 @@ private fun BusinessListItem(
                     )
                     Text(
                         text = when (business.type) {
-                            BusinessType.RESTAURANT ->
-                                business.cuisine ?: "Restaurant"
-                            BusinessType.OTHER -> "Walk-in service"
+                            BusinessType.RESTAURANT -> business.cuisine ?: "Restaurant"
+                            BusinessType.CAFE -> "Cafe"
+                            BusinessType.CINEMA -> "Cinema"
+                            BusinessType.SHOP -> "Shop"
+                            BusinessType.TOURS_AND_ATTRACTIONS -> "Tours & Attractions"
+                            BusinessType.SALON_AND_BEAUTY -> "Salon & Beauty"
+                            BusinessType.OTHER -> "Other Business"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

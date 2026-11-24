@@ -65,7 +65,7 @@ fun NearbyRestaurantsScreen(
             else -> searchLauncher.launch(arrayOf(Manifest.permission.ACCESS_FINE_LOCATION, Manifest.permission.ACCESS_COARSE_LOCATION))
         }
     }
-    Scaffold(topBar = { TopAppBar(title = { Text("Find restaurants") }, navigationIcon = {
+    Scaffold(topBar = { TopAppBar(title = { Text("Find places") }, navigationIcon = {
         TextButton(onClick = onBack) { Text("Back") }
     }) }) { padding ->
         LazyColumn(
@@ -74,7 +74,7 @@ fun NearbyRestaurantsScreen(
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
             item {
-                Text("Find real restaurants nearby or search by name and city anywhere in the world. Queues shown here are simulated NextIn demo queues, not real restaurant waitlists.")
+                Text("Search for a place")
             }
             item {
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -116,17 +116,17 @@ fun NearbyRestaurantsScreen(
                         Button(
                             onClick = { searchRestaurants() },
                             enabled = !state.loading && searchQuery.isNotBlank()
-                        ) { Text("Search restaurants") }
+                        ) { Text("Search businesses") }
                     }
                 } else {
                     item { Button(onClick = { requestRestaurants() }, enabled = !state.loading) {
-                        Text(if (state.restaurants.isEmpty()) "Find restaurants near me" else "Refresh nearby restaurants")
+                        Text(if (state.restaurants.isEmpty()) "Find places near me" else "Refresh nearby businesses")
                     } }
                 }
                 if (state.loading) item { CircularProgressIndicator() }
                 state.error?.let { error -> item { Text(error, color = MaterialTheme.colorScheme.error) } }
                 if (!state.loading && state.error == null && state.restaurants.isEmpty() && searchMode) {
-                    item { Text("Enter a search above to find restaurants.") }
+                    item { Text("Enter a search above to find businesses") }
                 }
                 items(state.restaurants, key = { it.id }) { restaurant ->
                     OutlinedCard(modifier = Modifier.fillMaxWidth()) {
