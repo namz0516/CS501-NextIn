@@ -46,6 +46,10 @@ fun BusinessDetailsScreen(
                 )
                 Text("Go back and select another business.")
             } else {
+                if (business.id.startsWith("google-demo:")) {
+                    Text("DEMO ONLY: This queue is simulated in NextIn, not managed by the restaurant.", color = MaterialTheme.colorScheme.error)
+                }
+
                 Text(
                     text = business.name,
                     style = MaterialTheme.typography.headlineMedium,
@@ -54,9 +58,13 @@ fun BusinessDetailsScreen(
 
                 Text(
                     text = when (business.type) {
-                        BusinessType.RESTAURANT ->
-                            business.cuisine ?: "Restaurant"
-                        BusinessType.OTHER -> "Walk-in service"
+                        BusinessType.RESTAURANT -> business.cuisine ?: "Restaurant"
+                        BusinessType.CAFE -> "Cafe"
+                        BusinessType.CINEMA -> "Cinema"
+                        BusinessType.SHOP -> "Shop"
+                        BusinessType.TOURS_AND_ATTRACTIONS -> "Tours & Attractions"
+                        BusinessType.SALON_AND_BEAUTY -> "Salon & Beauty"
+                        BusinessType.OTHER -> "Other Business"
                     },
                     style = MaterialTheme.typography.titleMedium,
                     color = MaterialTheme.colorScheme.primary
