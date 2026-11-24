@@ -5,10 +5,15 @@ import android.content.Context
 import android.content.Intent
 import com.example.nextin.data.cloud.CloudQueueCodec
 import com.example.nextin.data.cloud.CloudQueueStore
+import com.example.nextin.data.model.Business
+import com.example.nextin.data.model.QueueEntry
+import com.example.nextin.data.model.QueueSnapshot
+import com.example.nextin.data.model.QueueStatus
 import com.example.nextin.domain.queue.AlertDecision
 import com.example.nextin.domain.queue.AlertKind
 import com.example.nextin.domain.queue.AlertSchedule
 import com.example.nextin.domain.queue.QueueAlert
+import com.example.nextin.wear.PhoneQueueSync
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.CancellationException
@@ -100,9 +105,28 @@ class QueueAlertReceiver : BroadcastReceiver() {
                         } catch (exception: Exception) {
                             if (exception is CancellationException) throw exception
                         }
+                        showExpiredOnWatch(context, uid, entryId, businessId, businessName)
                     }
                 }
             }
+        }
+    }
+
+    private suspend fun showExpiredOnWatch(
+        context: Context,
+        uid: String,
+        entryId: String,
+        businessId: String,
+        businessName: String
+    ) {
+        val snapshot = QueueSnapshot(
+            listOf(Business(id = businessId, name = businessName)),
+            listOf(QueueEntry(id = entryId, businessId = businessId, customerUid = uid, status = QueueStatus.EXPIRED))
+        )
+        try {
+            PhoneQueueSync(context).publish(snapshot, uid)?.await()
+        } catch (exception: Exception) {
+            if (exception is CancellationException) throw exception
         }
     }
 
