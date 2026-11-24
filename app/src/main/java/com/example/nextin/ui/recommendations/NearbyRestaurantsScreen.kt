@@ -33,8 +33,7 @@ fun NearbyRestaurantsScreen(
     var searchQuery by remember { mutableStateOf("") }
     val context = LocalContext.current
     val state by model.state.collectAsStateWithLifecycle()
-    val showNearby by model.showNearby.collectAsStateWithLifecycle(initialValue = true)
-    // Remember denial within this screen so searches do not repeatedly prompt.
+    //remember denial within this screen so searches don't repeatedly prompt
     var searchPermissionAsked by rememberSaveable { mutableStateOf(false) }
     var searchWithoutLocation by rememberSaveable { mutableStateOf(false) }
     val searchLauncher = rememberLauncherForActivityResult(
@@ -90,14 +89,7 @@ fun NearbyRestaurantsScreen(
                     )
                 }
             }
-            if (!searchMode) item {
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-                    Text("Show recommendations")
-                    Switch(checked = showNearby, onCheckedChange = model::setShowNearby)
-                }
-            }
             queueError?.let { message -> item { Text(message, color = MaterialTheme.colorScheme.error) } }
-            if (searchMode || showNearby) {
                 if (searchMode) {
                     item {
                         OutlinedTextField(
@@ -105,12 +97,12 @@ fun NearbyRestaurantsScreen(
                             onValueChange = { searchQuery = it },
                             modifier = Modifier.fillMaxWidth(),
                             label = { Text("Restaurant name") },
-                            placeholder = { Text("e.g. Sharetea") },
+                            placeholder = { Text("Ex: Sharetea") },
                             singleLine = true
                         )
                     }
                     if (searchWithoutLocation) item {
-                        Text("Location unavailable or denied. Search still works, but results are not sorted by distance.", style = MaterialTheme.typography.bodySmall)
+                        Text("Location unavailable or denied. Search still works but results aren't sorted by distance", style = MaterialTheme.typography.bodySmall)
                     }
                     item {
                         Button(
@@ -146,16 +138,15 @@ fun NearbyRestaurantsScreen(
                                 }
                                 Text(distanceLabel, style = MaterialTheme.typography.labelMedium)
                             }
-                            Text("Demo queue only — not the restaurant's actual waitlist", style = MaterialTheme.typography.labelSmall)
+                            Text("Demo queue only, not the restaurant's actual waitlist", style = MaterialTheme.typography.labelSmall)
                             Button(onClick = { onDemoQueue(restaurant) }, enabled = !queueBusy) {
                                 Text("Open NextIn demo queue")
                             }
                         }
                     }
                 }
-                if (state.restaurants.isNotEmpty()) item {
-                    Text("Restaurant information provided by Google Places", style = MaterialTheme.typography.labelSmall)
-                }
+            if (state.restaurants.isNotEmpty()) item {
+                Text("Information provided by Google Places", style = MaterialTheme.typography.labelSmall)
             }
         }
     }
