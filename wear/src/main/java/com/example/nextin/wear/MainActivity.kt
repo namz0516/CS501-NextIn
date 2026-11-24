@@ -1,6 +1,12 @@
 package com.example.nextin.wear
 
 import android.os.Bundle
+import androidx.compose.foundation.background
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.sp
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.Arrangement
@@ -33,32 +39,128 @@ class MainActivity : ComponentActivity(), DataClient.OnDataChangedListener {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
         setContent {
             MaterialTheme {
                 val value by queue
+
+                val teal = Color(0xFF5EEAD4)
+                val muted = Color(0xFF94A3B8)
+                val white = Color(0xFFF1F5F9)
+
+                val accent = when (value.status) {
+                    "WAITING" -> teal
+                    "CALLED" -> Color(0xFF86EFAC)
+                    "EXPIRED" -> Color(0xFFFCA5A5)
+                    else -> muted
+                }
+
+                val statusLabel = when (value.status) {
+                    "WAITING" -> "IN QUEUE"
+                    "CALLED" -> "READY"
+                    "EXPIRED" -> "EXPIRED"
+                    else -> "NO ACTIVE QUEUE"
+                }
+
+                val headline = when (value.status) {
+                    "WAITING" -> "#${value.ahead + 1}"
+                    "CALLED" -> "✓"
+                    "EXPIRED" -> "!"
+                    else -> "—"
+                }
+
+                val title = when (value.status) {
+                    "WAITING" -> value.business
+                    "CALLED" -> "Your turn!"
+                    "EXPIRED" -> "Call expired"
+                    else -> "Join a queue"
+                }
+
+                val subtitle = when (value.status) {
+                    "WAITING" -> if (value.ahead == 1)
+                        "1 party ahead"
+                    else "${value.ahead} parties ahead"
+                    "CALLED" -> "Please head over"
+                    "EXPIRED" -> "Check your phone"
+                    else -> "on your phone"
+                }
+
                 Column(
-                    modifier = Modifier.fillMaxSize().padding(horizontal = 24.dp),
-                    verticalArrangement = Arrangement.Center,
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(Color(0xFF101719))
+                        .padding(horizontal = 24.dp),
+                    verticalArrangement = Arrangement.spacedBy(
+                        3.dp, Alignment.CenterVertically
+                    ),
                     horizontalAlignment = Alignment.CenterHorizontally
                 ) {
-                    Text("NextIn", textAlign = TextAlign.Center)
-                    when (value.status) {
-                        "WAITING" -> {
-                            Text(value.business, textAlign = TextAlign.Center)
-                            Text("Position #${value.ahead + 1}", textAlign = TextAlign.Center)
-                            Text("${value.ahead} ahead of you", textAlign = TextAlign.Center)
-                        }
-                        "CALLED" -> {
-                            Text(value.business, textAlign = TextAlign.Center)
-                            Text("Your turn!", textAlign = TextAlign.Center)
-                        }
-                        "EXPIRED" -> Text("Your call expired", textAlign = TextAlign.Center)
-                        else -> Text("Join a demo queue on your phone", textAlign = TextAlign.Center)
-                    }
+                    Text(
+                        text = "NextIn",
+                        color = teal,
+                        fontSize = 16.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = statusLabel,
+                        color = accent,
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        letterSpacing = 0.7.sp,
+                        modifier = Modifier
+                            .background(
+                                accent.copy(alpha = 0.12f),
+                                RoundedCornerShape(20.dp)
+                            )
+                            .padding(
+                                horizontal = 8.dp,
+                                vertical = 3.dp
+                            )
+                    )
+
+                    Text(
+                        text = headline,
+                        color = accent,
+                        fontSize = 38.sp,
+                        lineHeight = 42.sp,
+                        fontWeight = FontWeight.Bold,
+                        textAlign = TextAlign.Center
+                    )
+
+                    Text(
+                        text = title,
+                        color = white,
+                        fontSize = 13.sp,
+                        lineHeight = 15.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        textAlign = TextAlign.Center,
+                        maxLines = 2,
+                        overflow = TextOverflow.Ellipsis
+                    )
+
+                    Text(
+                        text = subtitle,
+                        color = muted,
+                        fontSize = 11.sp,
+                        lineHeight = 13.sp,
+                        textAlign = TextAlign.Center
+                    )
+
                     if (value.updatedAt > 0) {
-                        val time = java.text.DateFormat.getTimeInstance(java.text.DateFormat.SHORT)
+                        val time = java.text.DateFormat
+                            .getTimeInstance(java.text.DateFormat.SHORT)
                             .format(java.util.Date(value.updatedAt))
-                        Text("Last synced $time", textAlign = TextAlign.Center)
+
+                        Text(
+                            text = "Synced $time",
+                            color = muted,
+                            fontSize = 9.sp,
+                            lineHeight = 11.sp,
+                            textAlign = TextAlign.Center,
+                            modifier = Modifier.padding(top = 4.dp)
+                        )
                     }
                 }
             }
