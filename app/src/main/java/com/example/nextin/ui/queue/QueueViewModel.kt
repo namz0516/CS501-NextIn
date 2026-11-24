@@ -7,6 +7,9 @@ import com.example.nextin.data.cloud.*
 import com.example.nextin.data.local.NextInDatabase
 import com.example.nextin.data.local.RoomQueueStore
 import com.example.nextin.data.model.*
+import com.example.nextin.data.repository.LocalQueueRepository
+import com.example.nextin.data.places.NearbyRestaurant
+import com.example.nextin.wear.PhoneQueueSync
 import com.example.nextin.data.sample.SampleBusinessData
 import com.example.nextin.domain.queue.AlertSchedule
 import com.example.nextin.domain.queue.GracePeriod
@@ -37,6 +40,11 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     private var scheduledOffset: Long? = null
     private var scheduledExact: Boolean? = null
     private val operationMutex = Mutex()
+    private val wearSync = PhoneQueueSync(application)
+    private var demoRepository: LocalQueueRepository? = null
+
+    private fun isDemoBusiness(id: String): Boolean =
+        id.startsWith("google-demo:")
     private var customerUid = ""
     private var cache: RoomQueueStore? = null
     private val cacheWrites = Channel<Pair<RoomQueueStore, QueueSnapshot>>(Channel.CONFLATED)
@@ -85,6 +93,8 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
             stopListeners()
             customerUid = ""
             cache = null
+            demoRepository = null
+            wearSync.publish(QueueSnapshot(), "")
             ownEntries = emptyList()
             publicEntries = emptyList()
             mutableState.value = QueueSnapshot()
@@ -110,6 +120,26 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
             while (isActive) {
                 mutableNow.value = clock.now()
                 checkExpiry()
+
+                if (mutableReady.value && !mutableBusy.value) {
+                    operationMutex.withLock {
+                        val repo = demoRepository
+                        if (repo != null) {
+                            try {
+                                val previous = repo.state.value
+                                withContext(Dispatchers.IO) {
+                                    repo.expireCalls()
+                                }
+                                if (previous != repo.state.value) publish()
+                            } catch (exception: CancellationException) {
+                                throw exception
+                            } catch (exception: Exception) {
+                                mutableError.value =
+                                    "Could not update demo queue expiry."
+                            }
+                        }
+                    }
+                }
                 sendReminderIfDue()
                 if (mutableReady.value && scheduledExact != null &&
                     scheduledExact != AlertScheduler.exactAllowed(getApplication())) {
@@ -130,6 +160,21 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
                 customerUid = requireNotNull(user) { "Customer sign-in failed." }.uid
                 val store = RoomQueueStore(NextInDatabase.forCustomer(getApplication(), customerUid))
                 val saved = withContext(Dispatchers.IO) { store.load() }
+                val demoStore = RoomQueueStore(
+                    NextInDatabase.forCustomer(
+                        getApplication(), "local-demo:" + customerUid
+                    )
+                )
+
+                demoRepository = withContext(Dispatchers.IO) {
+                    val demoSaved = demoStore.load()
+                    LocalQueueRepository(
+                        initialBusinesses = demoSaved?.businesses.orEmpty(),
+                        initialEntries = demoSaved?.entries.orEmpty(),
+                        persist = demoStore::save
+                    ).also { it.expireCalls() }
+                }
+
                 cache = store
                 businesses = saved?.businesses ?: SampleBusinessData.businesses.map { it.copy(queueOpen = false) }
                 ownEntries = saved?.entries.orEmpty().filter { it.customerUid == customerUid }
@@ -189,14 +234,23 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         val entries = (publicEntries.associateBy { it.id } +
             ownEntries.filter { it.customerUid == customerUid }.associateBy { it.id })
             .values.sortedWith(compareBy<QueueEntry> { it.joinedAtMillis }.thenBy { it.id })
-        val snapshot = QueueSnapshot(allBusinesses, entries)
+        val cloudSnapshot = QueueSnapshot(allBusinesses, entries)
+        val demo = demoRepository?.state?.value ?: QueueSnapshot()
+
+        val snapshot = QueueSnapshot(
+            businesses = allBusinesses + demo.businesses,
+            entries = (entries + demo.entries).sortedWith(
+                compareBy<QueueEntry> { it.joinedAtMillis }.thenBy { it.id }
+            )
+        )
         val previous = mutableState.value
         mutableState.value = snapshot
+        wearSync.publish(snapshot, customerUid)
         if (mutableReady.value && previous != snapshot) {
             QueueAlerts.detect(previous, snapshot, customerUid).forEach { showAlert(it, snapshot) }
         }
         if (mutableReady.value) syncAlarms(snapshot)
-        cache?.let { cacheWrites.trySend(it to snapshot) }
+        cache?.let { cacheWrites.trySend(it to cloudSnapshot) }
         mutableConnected.value = businessOnline && publicOnline && customerOnline
         val id = staffBusinessId
         mutableStaffState.value = QueueSnapshot(
@@ -257,15 +311,136 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
     fun currentEntry(snapshot: QueueSnapshot): QueueEntry? =
         activeEntry(snapshot) ?: snapshot.entries.lastOrNull { it.customerUid == customerUid }
 
-    fun join(businessId: String, name: String, size: Int, onSuccess: () -> Unit) =
-        execute(onSuccess = onSuccess) {
-            val id = customerCloud.join(businessId, name, size)
-            // Navigate only once the committed entry has reached the screen state.
-            withTimeout(15000) { state.first { snapshot -> snapshot.entries.any { it.id == id } } }
+    fun join(
+        businessId: String,
+        name: String,
+        size: Int,
+        onSuccess: () -> Unit
+    ) {
+        if (activeEntry(state.value) != null) {
+            mutableError.value =
+                "You already have an active queue. Leave it before joining another."
+            return
         }
 
-    fun leave(entryId: String) = execute { customerCloud.leave(entryId) }
-    fun confirmArrival(entryId: String) = execute { customerCloud.confirmArrival(entryId) }
+        if (isDemoBusiness(businessId)) {
+            executeDemo(onSuccess = onSuccess) {
+                it.join(businessId, customerUid, name, size)
+            }
+        } else {
+            execute(onSuccess = onSuccess) {
+                val id = customerCloud.join(businessId, name, size)
+                withTimeout(15000) {
+                    state.first { snapshot ->
+                        snapshot.entries.any { it.id == id }
+                    }
+                }
+            }
+        }
+    }
+
+    private fun isDemoEntry(entryId: String): Boolean =
+        demoRepository?.state?.value?.entries?.any {
+            it.id == entryId
+        } == true
+
+    fun leave(entryId: String) {
+        if (isDemoEntry(entryId)) {
+            executeDemo { it.leave(entryId, customerUid) }
+        } else {
+            execute { customerCloud.leave(entryId) }
+        }
+    }
+
+    fun confirmArrival(entryId: String) {
+        if (isDemoEntry(entryId)) {
+            executeDemo { it.confirmArrival(entryId, customerUid) }
+        } else {
+            execute { customerCloud.confirmArrival(entryId) }
+        }
+    }
+
+    fun registerDemoRestaurant(restaurant: NearbyRestaurant, onSuccess: (String) -> Unit) {
+        val id = "google-demo:${restaurant.id}"
+        val business = Business(
+            id = id,
+            name = restaurant.name,
+            address = restaurant.address,
+            description = "NextIn demonstration queue. Not operated by this restaurant.",
+            latitude = restaurant.latitude,
+            longitude = restaurant.longitude,
+            type = when (restaurant.primaryType) {
+                "restaurant", "meal_takeaway", "meal_delivery" ->
+                    BusinessType.RESTAURANT
+
+                "cafe", "coffee_shop", "tea_house",
+                "bubble_tea_store", "beverage_store",
+                "juice_shop" ->
+                    BusinessType.CAFE
+
+                "movie_theater" ->
+                    BusinessType.CINEMA
+
+                "store", "clothing_store", "shopping_mall",
+                "convenience_store", "book_store", "shoe_store",
+                "electronics_store", "supermarket" ->
+                    BusinessType.SHOP
+
+                "tourist_attraction", "travel_agency" ->
+                    BusinessType.TOURS_AND_ATTRACTIONS
+
+                "beauty_salon", "hair_salon", "nail_salon" ->
+                    BusinessType.SALON_AND_BEAUTY
+
+                else -> BusinessType.OTHER
+            },
+            queueOpen = true,
+            settings = BusinessSettings(
+                seatingMode = SeatingMode.FCFS,
+                maxPartySize = 8,
+                averageServiceMinutes = 25,
+                gracePeriodMinutes = 5
+            ),
+            tables = listOf(2, 4, 6, 8).mapIndexed { index, capacity ->
+                RestaurantTable(id = "${id}:table:${index}", capacity = capacity)
+            }
+        )
+        executeDemo(onSuccess = { onSuccess(id) }) {
+            it.registerDemoRestaurant(business)
+        }
+    }
+
+
+    private fun executeDemo(
+        onSuccess: () -> Unit = {},
+        action: (LocalQueueRepository) -> Unit
+    ) {
+        if (mutableBusy.value || !mutableReady.value) return
+
+        mutableBusy.value = true
+        clearError()
+
+        viewModelScope.launch {
+            try {
+                operationMutex.withLock {
+                    val repo = requireNotNull(demoRepository)
+                    withContext(Dispatchers.IO) {
+                        action(repo)
+                    }
+                    publish()
+                }
+                onSuccess()
+            } catch (exception: CancellationException) {
+                throw exception
+            } catch (exception: Exception) {
+                publish()
+                mutableError.value =
+                    exception.message ?: "Could not update the demo queue."
+            } finally {
+                mutableBusy.value = false
+            }
+        }
+    }
 
     private fun staffStore(id: String): CloudStaffQueueStore {
         require(staffBusinessId == id && mutableStaffReady.value) { "Reconnect or sign in to this business." }
@@ -310,7 +485,8 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         val snapshot = if (id != null && mutableStaffReady.value) staffState.value else state.value
         val expired = snapshot.entries.firstOrNull { entry ->
             val business = snapshot.businesses.firstOrNull { it.id == entry.businessId }
-            (id != null || entry.customerUid == customerUid) &&
+            !isDemoBusiness(entry.businessId) &&
+                (id != null || entry.customerUid == customerUid) &&
                 business != null && GracePeriod.hasExpired(entry, business, clock.now())
         } ?: return
         if (id == null && expired.customerUid != customerUid) return
@@ -350,7 +526,10 @@ class QueueViewModel(application: Application) : AndroidViewModel(application) {
         val reschedule = offsetChanged || scheduledExact != exact
         val saved = alertPreferences.scheduledAlarms()
         val planned = mutableMapOf<String, String>()
-        snapshot.entries.filter { it.customerUid == customerUid }.forEach { entry ->
+        snapshot.entries.filter {
+            it.customerUid == customerUid &&
+                !isDemoBusiness(it.businessId)
+        }.forEach { entry ->
             val business = snapshot.businesses.firstOrNull { it.id == entry.businessId } ?: return@forEach
             val grace = business.settings.gracePeriodMinutes
             val times = AlertSchedule.times(entry, grace)

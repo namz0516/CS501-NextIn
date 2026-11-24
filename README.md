@@ -4,7 +4,7 @@ NextIn is a virtual queue app for customers and business staff, built with Kotli
 
 ### Things done so far:
 - Welcome screen with temporary customer/staff selection
-- Customer screens to browse restaurants, view details, and join a queue
+- Customer screens to browse businesses, view details, and join a queue
 - Current queue screen showing position and estimated wait time
 - Staff dashboard to manage queues, add walk-ins, and call the next party
 - Queue management with FCFS and seating rules

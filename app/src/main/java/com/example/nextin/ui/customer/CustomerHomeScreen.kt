@@ -24,9 +24,11 @@ fun CustomerHomeScreen(
     entries: List<QueueEntry>,
     onBusinessClick: (String) -> Unit,
     onMyQueue: () -> Unit,
+    onNearbyRestaurants: () -> Unit,
     onBack: () -> Unit,
     connected: Boolean = true
 ) {
+    val visibleBusinesses = businesses
     Scaffold(
         topBar = {
             TopAppBar(
@@ -107,6 +109,12 @@ fun CustomerHomeScreen(
             }
 
             item {
+                OutlinedButton(onClick = onNearbyRestaurants, modifier = Modifier.fillMaxWidth()) {
+                    Text("Explore places nearby")
+                }
+            }
+
+            item {
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     verticalAlignment = Alignment.CenterVertically
@@ -118,21 +126,21 @@ fun CustomerHomeScreen(
                         modifier = Modifier.weight(1f)
                     )
                     Text(
-                        text = "${businesses.size} available",
+                        text = "${visibleBusinesses.size} businesses",
                         style = MaterialTheme.typography.labelMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant
                     )
                 }
             }
 
-            if (businesses.isEmpty()) {
+            if (visibleBusinesses.isEmpty()) {
                 item {
-                    Text("No businesses are available right now.")
+                    Text("Find nearby places to open a NextIn demo queue.")
                 }
             }
 
             items(
-                items = businesses,
+                items = visibleBusinesses,
                 key = { it.id }
             ) { business ->
                 val waitingCount = entries.count {
@@ -154,7 +162,7 @@ fun CustomerHomeScreen(
 
             item {
                 Text(
-                    text = "Demo businesses • Wait times are approximate",
+                    text = "Nearby demo queues are simulated and do not represent actual business wait times.",
                     style = MaterialTheme.typography.bodySmall,
                     color = MaterialTheme.colorScheme.onSurfaceVariant
                 )
@@ -212,15 +220,21 @@ private fun BusinessListItem(
                     verticalArrangement = Arrangement.spacedBy(4.dp)
                 ) {
                     Text(
-                        text = business.name,
+                        text = if (business.id.startsWith("google-demo:"))
+                            "${business.name} (Demo)"
+                        else business.name,
                         style = MaterialTheme.typography.titleMedium,
                         fontWeight = FontWeight.Bold
                     )
                     Text(
                         text = when (business.type) {
-                            BusinessType.RESTAURANT ->
-                                business.cuisine ?: "Restaurant"
-                            BusinessType.OTHER -> "Walk-in service"
+                            BusinessType.RESTAURANT -> business.cuisine ?: "Restaurant"
+                            BusinessType.CAFE -> "Cafe"
+                            BusinessType.CINEMA -> "Cinema"
+                            BusinessType.SHOP -> "Shop"
+                            BusinessType.TOURS_AND_ATTRACTIONS -> "Tours & Attractions"
+                            BusinessType.SALON_AND_BEAUTY -> "Salon & Beauty"
+                            BusinessType.OTHER -> "Other Business"
                         },
                         style = MaterialTheme.typography.bodySmall,
                         color = MaterialTheme.colorScheme.onSurfaceVariant

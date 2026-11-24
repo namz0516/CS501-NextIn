@@ -13,7 +13,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 
 @Composable
-fun WelcomeScreen(onCustomerClick: () -> Unit, onStaffClick: () -> Unit) {
+fun WelcomeScreen(onCustomerClick: () -> Unit, onStaffClick: () -> Unit, onScanQr: () -> Unit) {
     Scaffold { padding ->
         Column(
             modifier = Modifier
@@ -24,6 +24,11 @@ fun WelcomeScreen(onCustomerClick: () -> Unit, onStaffClick: () -> Unit) {
             horizontalAlignment = Alignment.CenterHorizontally,
             verticalArrangement = Arrangement.spacedBy(24.dp)
         ) {
+            OutlinedButton(
+                onClick = onScanQr,
+                modifier = Modifier.align(Alignment.End)
+            ) { Text("Scan QR") }
+
             Surface(
                 shape = MaterialTheme.shapes.extraLarge,
                 color = MaterialTheme.colorScheme.primaryContainer

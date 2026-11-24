@@ -11,7 +11,22 @@
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
+            <!-- Demo QR opens NextIn directly to the Orca Sightseeing join form. -->
+            <intent-filter>
+                <action android:name="android.intent.action.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+                <category android:name="android.intent.category.BROWSABLE" />
+                <data android:scheme="nextin" android:host="join" android:pathPrefix="/" />
+            </intent-filter>
         </activity>
         <receiver android:name=".notifications.QueueAlertReceiver" android:exported="false" />
     </application>
+    <!-- allows nextin to communicate with google places -->
+    <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- for approx location -->
+    <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+
+    <!-- for precise location -->
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 </manifest>

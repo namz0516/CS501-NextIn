@@ -1,3 +1,5 @@
+import java.util.Properties
+
 plugins {
     id("com.google.devtools.ksp")
     id("com.android.application")
@@ -5,6 +7,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
     id("com.google.gms.google-services")
 }
+
+// Read from local properties
+val localProperties = Properties().apply {
+    val file = rootProject.file("local.properties")
+    if (file.exists()) {
+        file.inputStream().use { load(it) }
+    }
+}
+
+val placesApiKey = localProperties.getProperty("PLACES_API_KEY", "")
 
 android {
     namespace = "com.example.nextin"
@@ -17,15 +29,22 @@ android {
         versionCode = 1
         versionName = "1.0"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
+        buildConfigField("String", "PLACES_API_KEY", "\"$placesApiKey\"")
     }
 
     buildTypes { release { isMinifyEnabled = false } }
+
     compileOptions {
         sourceCompatibility = JavaVersion.VERSION_17
         targetCompatibility = JavaVersion.VERSION_17
     }
+
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {
@@ -43,13 +62,28 @@ dependencies {
     implementation("androidx.lifecycle:lifecycle-viewmodel-compose:2.9.0")
     implementation("androidx.lifecycle:lifecycle-runtime-compose:2.9.0")
 
-    // Keeps Firebase library versions compatible.
+    // Wear OS integration
+    implementation("com.google.android.gms:play-services-wearable:19.0.0")
+
+    // QR code scanning
+    implementation("com.google.android.gms:play-services-code-scanner:16.1.0")
+
+    // Google Places API
+    implementation("com.google.android.libraries.places:places:4.2.0")
+
+    // Android location services
+    implementation("com.google.android.gms:play-services-location:21.3.0")
+
+    // DataStore
+    implementation("androidx.datastore:datastore-preferences:1.1.7")
+
+    // Material components required by SDK
+    implementation("com.google.android.material:material:1.12.0")
+
+    // Firebase
     implementation(platform("com.google.firebase:firebase-bom:34.6.0"))
-    // Provides customer and staff authentication.
     implementation("com.google.firebase:firebase-auth")
-    // Provides shared queue storage and live updates.
     implementation("com.google.firebase:firebase-firestore")
-    // Lets coroutines wait for Firebase operations without blocking the UI.
     implementation("org.jetbrains.kotlinx:kotlinx-coroutines-play-services:1.10.1")
 }
 
